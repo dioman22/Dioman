@@ -4,46 +4,38 @@ Goal: run the **Claude Code** CLI on DeepSeek (V4.1 Flash) instead of Anthropic'
 
 There are two ways, and only one of them needs a bridge.
 
-## Option A — hosted Anthropic-compatible gateway (no bridge)
+## Option A — any hosted Anthropic-compatible gateway (no bridge)
 
-If your gateway speaks the Anthropic Messages protocol itself, you only need `settings.json`. No
-proxy, no local process. [AnyModel](https://anymodel.org) is one such gateway: it resells Claude,
-GPT, Gemini, DeepSeek and others behind a single key and offers an Anthropic endpoint for Claude
-Code. Its own installer writes exactly this to `~/.claude/settings.json`:
+If a gateway speaks the Anthropic Messages protocol itself, you only need `settings.json`. No proxy,
+no local process. Shape it like this:
 
 ```json
 {
   "hasCompletedOnboarding": true,
   "env": {
-    "ANTHROPIC_BASE_URL": "https://anymodel.org/v1",
-    "ANTHROPIC_AUTH_TOKEN": "your-anymodel-api-key",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-8",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5-20251001"
+    "ANTHROPIC_BASE_URL": "https://your-gateway.example/v1",
+    "ANTHROPIC_AUTH_TOKEN": "your-gateway-api-key",
+    "ANTHROPIC_MODEL": "deepseek-flash",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-flash",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-flash",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-flash"
   }
 }
 ```
 
-Two details from that file are worth copying into any hosted-gateway setup:
+Two details carry over to every hosted gateway:
 
 - `"hasCompletedOnboarding": true` — skips the first-run wizard. Without it Claude Code can sit on
   the login screen and never read your project-level `env` block.
-- `ANTHROPIC_BASE_URL` ends in `/v1`. Claude Code's normalisation means a base ending in `/v1`
-  gets `/messages` appended; a base like `https://api.deepseek.com/anthropic` gets `/v1/messages`
-  appended. Getting that suffix wrong is the usual cause of a 404 on the messages route.
+- Watch the `/v1` suffix. A base ending in `/v1` gets `/messages` appended; a base like
+  `https://api.deepseek.com/anthropic` gets `/v1/messages` appended. A wrong suffix is the usual
+  cause of a 404 on the messages route.
 
-To point the model at DeepSeek, replace the three `*_MODEL` values with the id from AnyModel's
-models page. Its ids are `<provider-prefix>/<model>`, e.g. `cc/claude-opus-5-5`,
-`cx/gpt-6-astra`, `glm/glm-5.3-flash`. Add `ANTHROPIC_MODEL` with the same id to pin the main model.
+Use whatever model id that gateway publishes. Do not reuse Cline's ids
+(`cline-cloud/...`, `deepseek/deepseek-v4.1-flash`) — they only mean something on Cline's own API.
 
-AnyModel's own one-liner does the write for you:
-
-```sh
-bash <(curl -fsSL "https://anymodel.org/i?tool=claude&model=<model-id>") <YOUR_API_KEY>
-```
-
-The catch: this route bills **AnyModel**, not Cline. It is DeepSeek, but it is not Cline's routing or
-balance. If that distinction matters, use Option B.
+**This is not Cline.** It bills the gateway, not Cline. If you want Cline running on DeepSeek, see
+[`cline-deepseek.md`](./cline-deepseek.md) — that needs none of this.
 
 ## Option B — Cline's own gateway (bridge required)
 
