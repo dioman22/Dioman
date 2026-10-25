@@ -1,165 +1,168 @@
-# Running DeepSeek V4.1 Flash in Claude Code (outside Cline)
+# Cline's DeepSeek model inside Claude Code
 
-Goal: use `deepseek-flash` (DeepSeek-V4.1-Flash) from the Claude Code CLI, configured through
-`settings.json`, with no Cline client in the path.
+Goal: run the **Claude Code** CLI, but have it talk to **Cline's** DeepSeek model
+(`deepseek/deepseek-v4.1-flash`) rather than Anthropic's models.
 
-## Why you cannot keep pointing at the Cline gateway
+## The constraint that shapes the solution
 
-Claude Code speaks the **Anthropic Messages** protocol (`POST /v1/messages`). The Cline gateway only
-speaks the OpenAI chat-completions protocol:
+Claude Code speaks the **Anthropic Messages** protocol (`POST /v1/messages`). The Cline API is
+OpenAI-compatible only. Its own docs say: *"Programmatic access to AI models through an
+OpenAI-compatible Chat Completions API."* Every Anthropic path on the gateway is a 404:
 
 ```
-POST https://api.cline.bot/api/v1/chat/completions  → 200 / works
+POST https://api.cline.bot/api/v1/chat/completions  → 200
 POST https://api.cline.bot/api/v1/messages          → 404 {"error":"Not Found","success":false}
+POST https://api.cline.bot/v1/messages              → 404
+POST https://api.cline.bot/anthropic/v1/messages    → 404
+POST https://api.cline.bot/api/anthropic/v1/messages→ 404
+POST https://api.cline.bot/api/v1/anthropic/v1/messages → 404
 ```
 
-So `cline-cloud/deepseek-v4.1-flash` and `deepseek/deepseek-v4.1-flash` are both unusable from
-Claude Code — not because the model is gone, but because that gateway serves no Anthropic endpoint.
-Outside Cline you talk to DeepSeek directly.
+So there is no `settings.json` that makes Claude Code talk to Cline directly. You need a tiny
+protocol bridge in between. This repo ships one:
 
-## Endpoint
-
-| Item | Value |
-| --- | --- |
-| Anthropic base URL | `https://api.deepseek.com/anthropic` |
-| Endpoint Claude Code calls | `https://api.deepseek.com/anthropic/v1/messages` |
-| Model | `deepseek-flash` (DeepSeek-V4.1-Flash-1017) |
-| Alternate model | `deepseek-v4-pro` |
-| Credential | DeepSeek API key from `https://platform.deepseek.com/api_keys` |
-
-Verified on 2026-10-25: the endpoint accepts both `x-api-key` and `Authorization: Bearer`, and it
-returns errors in genuine Anthropic shape, e.g.
-
-```json
-{"error":{"message":"Authentication Fails, Your api key: ****-key is invalid",
-          "type":"authentication_error","param":null,"code":"invalid_request_error"}}
+```
+Claude Code ──Anthropic──▶ anthropic_cline_proxy.py ──OpenAI──▶ api.cline.bot ──▶ deepseek-v4.1-flash
+            :8787                                     /api/v1/chat/completions
 ```
 
-That shape matters — Claude Code parses it as an Anthropic error, so an auth failure surfaces as an
-auth failure rather than a generic parse error.
+## Step 1 — get a Cline API key
 
-## Recommended: user-scope `~/.claude/settings.json`
+1. Sign in at `https://app.cline.bot`
+2. **Settings → API Keys → Create new API key**
+3. Copy it. (This is a Cline API key, not a DeepSeek key — the model is billed through Cline.)
 
-This is the reliable location. Create `~/.claude/settings.json`:
+## Step 2 — start the bridge
 
-```json
-{
-  "env": {
-    "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
-    "ANTHROPIC_AUTH_TOKEN": "sk-your-deepseek-api-key",
-    "ANTHROPIC_MODEL": "deepseek-flash[1m]",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-flash[1m]",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-flash[1m]",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-flash",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "deepseek-flash",
-    "CLAUDE_CODE_EFFORT_LEVEL": "max",
-    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "786432"
-  }
-}
-```
-
-This is the variable set DeepSeek publishes for Claude Code. Notes on each choice:
-
-- `ANTHROPIC_AUTH_TOKEN` sends `Authorization: Bearer`. Unlike `ANTHROPIC_API_KEY`, it does **not**
-  require a one-time approval under `/config`, so it is the least fiddly option.
-- `deepseek-flash[1m]` asks Claude Code for the 1M-token context window. The `[1m]` suffix is
-  Claude Code's own context-window syntax, not part of the DeepSeek model name. Set it through
-  `env`/settings as shown: passing it on the `--model` flag is known to drop the suffix. On a build
-  that does not support the suffix, use plain `deepseek-flash`.
-- `ANTHROPIC_DEFAULT_*_MODEL` is what makes `/model` (Sonnet/Opus/Haiku slots) resolve onto DeepSeek
-  instead of erroring on an unknown Claude name.
-- `CLAUDE_CODE_AUTO_COMPACT_WINDOW=786432` keeps auto-compaction inside the model's real window.
-
-Never commit this file — it holds your key. Keep it in `$HOME`, not in a repository.
-
-## Alternative: project-scope `.claude/settings.json`
-
-This repository ships one at `.claude/settings.json` that keeps the secret out of git by reading it
-from the environment through `apiKeyHelper`:
-
-```json
-{
-  "apiKeyHelper": "printenv DEEPSEEK_API_KEY",
-  "env": {
-    "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
-    "ANTHROPIC_MODEL": "deepseek-flash[1m]",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-flash[1m]",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-flash[1m]",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-flash",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "deepseek-flash",
-    "CLAUDE_CODE_EFFORT_LEVEL": "max",
-    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "786432"
-  }
-}
-```
-
-Then export the key in the shell that launches Claude Code:
+Standard library only; no `pip install`, no Node.
 
 ```sh
-export DEEPSEEK_API_KEY="sk-your-deepseek-api-key"
-cd /path/to/project && claude
+export CLINE_API_KEY="your-cline-api-key"
+python3 scripts/anthropic_cline_proxy.py          # 127.0.0.1:8787
 ```
 
-Two caveats that send people in circles:
+Useful options, all environment variables:
 
-1. A **project** `env` block is applied only *after* first-run onboarding and the folder-trust
-   prompt. If Claude Code stops at the login screen, the project file is not in play yet — put the
-   credential in `~/.claude/settings.json` or export it in the shell.
-2. `apiKeyHelper` runs under `/bin/sh` and its stdout becomes the credential. Empty output (key
-   unset) becomes an empty credential, which reads as a 401.
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CLINE_API_KEY` | *(empty)* | Cline API key, sent as `Authorization: Bearer` upstream |
+| `CLINE_API_BASE` | `https://api.cline.bot/api/v1` | Upstream base URL |
+| `CLINE_MODEL` | `deepseek/deepseek-v4.1-flash` | Model used for names that are not passed through |
+| `PROXY_PORT` / `PROXY_HOST` | `8787` / `127.0.0.1` | Listen address |
+| `CLINE_REASONING_EFFORT` | *(empty)* | Passed through as `reasoning_effort` (e.g. `high`) |
+| `PROXY_FORWARD_REASONING` | `0` | `1` exposes the model's reasoning as Anthropic `thinking` blocks |
 
-## Verify it took
+Sanity check:
+
+```sh
+curl -s http://127.0.0.1:8787/health
+# {"ok": true, "upstream": "https://api.cline.bot/api/v1",
+#  "default_model": "deepseek/deepseek-v4.1-flash", "authenticated": true}
+```
+
+## Step 3 — point Claude Code at the bridge
+
+Put this in **`~/.claude/settings.json`** (user scope; this repo also ships a copy at
+`.claude/settings.json`):
+
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://127.0.0.1:8787",
+    "ANTHROPIC_AUTH_TOKEN": "local-bridge",
+    "ANTHROPIC_MODEL": "deepseek-flash",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-flash",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-flash",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-flash",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "deepseek-flash",
+    "CLAUDE_CODE_EFFORT_LEVEL": "max",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "786432"
+  }
+}
+```
+
+- `ANTHROPIC_AUTH_TOKEN` is any non-empty string here; the bridge ignores the client credential and
+  uses `CLINE_API_KEY` upstream. It must be non-empty, otherwise Claude Code shows the login screen.
+- `deepseek-flash` is a friendly alias the bridge maps to `deepseek/deepseek-v4.1-flash`. You can
+  also pass a full `vendor/model` id and it is forwarded untouched.
+- `ANTHROPIC_DEFAULT_*_MODEL` keeps the Sonnet/Opus/Haiku slots on the same model so `/model` does
+  not error.
+
+Prefer user scope: a **project** `env` block only applies after first-run onboarding and the
+folder-trust prompt, so a fresh install that shows the login screen will not read it yet.
+
+
+## Step 4 — verify
 
 ```sh
 claude
-# then inside the session:
 /status
 ```
 
-On the Status tab you should see an **Anthropic base URL** line showing
-`https://api.deepseek.com/anthropic`, plus an **Auth token** line naming `ANTHROPIC_AUTH_TOKEN` (or
-`apiKeyHelper`). If the base URL line is absent, Claude Code is not pointed at DeepSeek and nothing
-else will fix itself.
+The Status tab should show **Anthropic base URL: `http://127.0.0.1:8787`** and an auth line naming
+`ANTHROPIC_AUTH_TOKEN`. Then ask something trivial; you should get a reply from DeepSeek.
 
-A direct protocol check, no Claude Code involved:
+## What was verified end to end
 
-```sh
-curl -s -X POST https://api.deepseek.com/anthropic/v1/messages \
-  -H 'content-type: application/json' \
-  -H "x-api-key: $DEEPSEEK_API_KEY" \
-  -d '{"model":"deepseek-flash","max_tokens":32,
-       "messages":[{"role":"user","content":"say ok"}]}'
-```
+Every row below was run against the live `api.cline.bot` gateway through the bridge, not mocked:
 
-A `200` with `{"content":[{"type":"text","text":"ok"...}]}` means base URL, key and model are all
-correct.
+| Check | Result |
+| --- | --- |
+| `GET /health` | `200 {"ok": true, ...}` |
+| `POST /v1/messages` (plain text) | `200`, `content:[{type:text,text:"bridge-ok"}]`, `stop_reason:"end_turn"` |
+| `POST /v1/messages` `stream:true` | `message_start → content_block_start → content_block_delta → content_block_stop → message_delta → message_stop` |
+| Tool call, non-stream | `content:[{type:"tool_use", name:"get_weather", input:{"city":"Paris"}}]`, `stop_reason:"tool_use"` |
+| Tool call, stream | `content_block_start{tool_use}` + `input_json_delta` fragments + `message_stop` |
+| Multi-turn: `tool_use` → `tool_result` → answer | `200`, final text answer produced |
+| Gap between Claude Code's protocol and Cline's | none observed on these paths |
 
-## Model names Claude Code may send anyway
+Two behaviours worth knowing, both handled by the bridge:
 
-DeepSeek maps Claude names server-side, so an unmapped pick will not break a session:
-
-- `claude-opus*` → `deepseek-v4-pro` (billed at the V4 Pro price)
-- `claude-haiku*`, `claude-sonnet*` → `deepseek-flash`
-- any other non-`claude` name → `400`
-
-That is also why pinning `ANTHROPIC_DEFAULT_*_MODEL` to `deepseek-flash` is worth doing: it keeps the
-Opus slot off V4 Pro pricing.
+1. **Non-streaming upstream requests fail intermittently.** Asking the gateway for a single JSON
+   reply often returns `500 {"error":"empty response content","success":false}` when the model
+   spends its budget on reasoning, while streaming the same turn works. The bridge therefore always
+   streams upstream and aggregates locally when the client wants one JSON body.
+2. **`max_tokens` must be generous.** With a tiny budget the reasoning phase consumes everything and
+   the reply is empty. Claude Code already sends large budgets; keep it above ~256 if you script it.
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| Still asked to log in | Credential not visible before first-run | Set `ANTHROPIC_AUTH_TOKEN` in `~/.claude/settings.json` or the shell |
-| `401 Authentication Fails` | Bad or empty key | Re-check the key; confirm `apiKeyHelper` prints something |
-| `400` on the model name | Non-`claude` name not recognised | Use `deepseek-flash` or `deepseek-v4-pro` |
-| 404 on `/v1/messages` | Base URL still points at Cline | Use `https://api.deepseek.com/anthropic` |
-| Key ignored, no prompt | `ANTHROPIC_API_KEY` was declined once | Approve under `/config` → *Use custom API key*, or switch to `ANTHROPIC_AUTH_TOKEN` |
-| `/model` errors picking Sonnet | No defaults set | Add `ANTHROPIC_DEFAULT_SONNET_MODEL` |
+| Login screen instead of a session | `ANTHROPIC_AUTH_TOKEN` empty or not in `~/.claude/settings.json` | Add a non-empty value at user scope |
+| `502 api_error: ... Connection refused` | Bridge not running | Start `scripts/anthropic_cline_proxy.py` |
+| `401` from upstream | `CLINE_API_KEY` missing/invalid | Set it and restart the bridge |
+| `403 ... only available via Cline product surfaces` | Requested a `cline-cloud/*` id | Use `deepseek-flash` or `deepseek/deepseek-v4.1-flash` |
+| `400 invalid model format. Expected format: modelType/model` | Bare id forwarded to the gateway | Let the bridge alias it, or pass `vendor/model` |
+| Replies look truncated | `max_tokens` too small for the reasoning phase | Raise it, or set `CLINE_REASONING_EFFORT` |
 
-## What does not transfer from Cline
+## Alternative: skip Cline, use DeepSeek directly
 
-`cline-cloud/*` and `deepseek/*` are Cline-gateway identifiers. They mean nothing to DeepSeek's own
-API, which accepts `deepseek-flash`, `deepseek-v4-pro`, and the legacy `deepseek-v4-flash` /
-`deepseek-v4-flash-vision-exp` aliases only. See [`model-selection.md`](./model-selection.md) for
-the namespace and gating details.
+If you do not need Cline's billing/routing, DeepSeek exposes a native Anthropic endpoint and no
+bridge is required:
 
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
+    "ANTHROPIC_AUTH_TOKEN": "sk-your-deepseek-key",
+    "ANTHROPIC_MODEL": "deepseek-flash[1m]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-flash[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-flash[1m]",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-flash",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "deepseek-flash"
+  }
+}
+```
+
+That endpoint is genuinely Anthropic-shaped: it accepts `x-api-key` and `Authorization: Bearer` and
+returns Anthropic-format errors. `[1m]` is Claude Code's 1M-context suffix; drop it on builds that
+reject it.
+
+## Limitations of the bridge
+
+- `POST /v1/messages/count_tokens` returns a `chars/4` estimate, not a real tokenizer count. Claude
+  Code only uses it for display and compaction hints.
+- Reasoning text is hidden by default; enable `PROXY_FORWARD_REASONING=1` to surface it as
+  `thinking` blocks (unsigned, so some clients may object).
+- Single-process, no auth on the listener: it binds `127.0.0.1` by default. Do not expose it.

@@ -131,12 +131,18 @@ Is the ID a cline-cloud/* one?
 
 ## Using the model outside Cline
 
-The Cline gateway is OpenAI-compatible only — `POST https://api.cline.bot/api/v1/messages` returns
-`404`, so Anthropic-protocol clients (Claude Code, the Anthropic SDK) cannot use it or any
-`cline-cloud/*` ID. Use DeepSeek's Anthropic-compatible endpoint instead:
-`https://api.deepseek.com/anthropic` with model `deepseek-flash`.
+The Cline gateway is OpenAI-compatible only — `POST https://api.cline.bot/api/v1/messages` and every
+other Anthropic path return `404`, so Anthropic-protocol clients (Claude Code, the Anthropic SDK)
+cannot use it directly, and no `cline-cloud/*` id will help.
 
-Setup, `settings.json` recipes and verification steps: [`claude-code-setup.md`](./claude-code-setup.md).
+For Claude Code there are two options:
+
+- **Cline's model via a local bridge** — `scripts/anthropic_cline_proxy.py` translates Anthropic
+  `/v1/messages` to the gateway's `/chat/completions`. This is the way to keep using Cline billing.
+- **DeepSeek directly** — `https://api.deepseek.com/anthropic` speaks Anthropic natively, with model
+  `deepseek-flash`, and needs no bridge.
+
+Setup for both, plus verification steps: [`claude-code-setup.md`](./claude-code-setup.md).
 
 ## Reproducing the checks
 

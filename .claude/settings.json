@@ -1,10 +1,10 @@
 {
-  "apiKeyHelper": "printenv DEEPSEEK_API_KEY",
   "env": {
-    "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
-    "ANTHROPIC_MODEL": "deepseek-flash[1m]",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-flash[1m]",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-flash[1m]",
+    "ANTHROPIC_BASE_URL": "http://127.0.0.1:8787",
+    "ANTHROPIC_AUTH_TOKEN": "local-bridge",
+    "ANTHROPIC_MODEL": "deepseek-flash",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-flash",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-flash",
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-flash",
     "CLAUDE_CODE_SUBAGENT_MODEL": "deepseek-flash",
     "CLAUDE_CODE_EFFORT_LEVEL": "max",
