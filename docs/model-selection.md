@@ -129,7 +129,37 @@ Is the ID a cline-cloud/* one?
    "you have reached your … clinepass limit …"). Seeing one of those is a billing issue, not a
    model-ID issue.
 
-## Using the model outside Cline
+## Free models through the Cline API
+
+The message *"Free model usage is not supported through the Cline API. Free models are only available
+in the Cline IDE Extension and CLI"* is about one specific family, not free models in general.
+
+| Model id shape | Example | Through `api.cline.bot` with an API key |
+| --- | --- | --- |
+| `cline-free/*` (Cline's own promotional free tier) | `cline-free/anything` | `403 ... only available via Cline product surfaces` |
+| `<vendor>/<model>:free` (upstream free models) | `openrouter/free` | **works**, `200` |
+| `<vendor>/<model>:free` | `nvidia/nemotron-3-ultra-550b-a55b:free` | **works**, `200` |
+| Paid | `deepseek/deepseek-v4.1-flash` | works, billed |
+
+Verified 2026-10-25 — the `:free` rows returned real completions:
+
+```
+openrouter/free                          → 200 {"choices":[{"message":{"content":"Ok."}}]}
+nvidia/nemotron-3-ultra-550b-a55b:free   → 200 {"choices":[{"message":{"content":"ok"}}]}
+cline-free/anything                      → 403 only available via Cline product surfaces
+google/gemma-4-26b-a4b-it:free           → 500 upstream 429 (provider rate limit, not a gate)
+```
+
+So:
+
+- Want Cline's own free tier → use the **Cline IDE extension or CLI signed in to a Cline account**.
+  It is deliberately not reachable with an API key.
+- Want a free model through the API → pick a `:free` id from `GET /api/v1/models`. Expect upstream
+  `429`s on the popular ones; they are rate-limited, not blocked.
+- Through the bridge, set `CLINE_MODEL` to whichever id you chose, e.g.
+  `CLINE_MODEL=openrouter/free`.
+
+
 
 The Cline gateway is OpenAI-compatible only — `POST https://api.cline.bot/api/v1/messages` and every
 other Anthropic path return `404`, so Anthropic-protocol clients (Claude Code, the Anthropic SDK)
