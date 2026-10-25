@@ -11,10 +11,19 @@ All values below were verified live against the providers on 2026-10-25.
 
 ## Short answer
 
-`deepseek/deepseek-v4.1-flash` **is a real, working model ID**. It is not a typo and it is not
-retired. The error means the request reached a provider that does not resolve *that exact
-string* for the provider you have selected — either because a different provider was active,
-or because the client build is older than the model.
+Both IDs name the same model, which exists and is live:
+
+- `deepseek/deepseek-v4.1-flash` — callable through the Cline gateway **and** OpenRouter. Works.
+- `cline-cloud/deepseek-v4.1-flash` — a **gate-locked alias** served only to Cline product
+  surfaces. Returns `403` everywhere else.
+
+So the error never means "this model does not exist" in the literal sense. It means the request
+used an ID the target endpoint will not authorize for the caller, which happens when:
+
+1. the ID is a `cline-cloud/*` alias and the client is not a current Cline product surface, or
+2. the ID's namespace does not match the selected provider (OpenRouter-shaped slug against the
+   DeepSeek direct API), or
+3. the client's catalog predates the model and the gateway answers `404 model not found`.
 
 The trailing `(success)` is a client rendering artifact of the gateway response envelope
 (`{"error": ..., "success": false}`). It does not mean the call succeeded.
@@ -38,24 +47,69 @@ Notes:
 - `cline-cloud/<model>` IDs (for example `cline-cloud/deepseek-v4.1-flash`) are served only to
   Cline product surfaces. Calling them from a script or an older client returns 403.
 - DeepSeek's own API retired `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp`; those names
-  still route to V4.1 Flash for compatibility but are gated the same way.
+  still route to V4.1 Flash there for compatibility. On the **Cline gateway**,
+  `deepseek/deepseek-v4-flash` is instead product-surface gated (`403`), so do not use it as a
+  fallback.
+
+## When the error names `cline-cloud/…`
+
+`cline-cloud/*` is a **restricted catalog namespace**. The gateway serves it only to Cline's own
+product clients and answers everything else with a deterministic `403`:
+
+```
+cline-cloud/deepseek-v4.1-flash
+→ 403 {"error":{"code":"API_REQUEST_ERROR_CODE",
+        "message":"Error 403: cline-cloud/deepseek-v4.1-flash is only available via
+                   Cline product surfaces. If you are using an old version of Cline,
+                   please update to the latest version"}}
+```
+
+Reproduced 3/3 with no variation, while `deepseek/deepseek-v4.1-flash` returned `200` 3/3 in the
+same loop. So this is a **policy gate on the namespace, not a missing model** — the same weights
+are reachable, just under the `deepseek/` name instead.
+
+The client buckets both `403` (no access) and `404` (not found) into the single message
+"It may not exist or you may not have access to it", which is why a gate and a typo look
+identical in the UI.
+
+Practical consequence: a `cline-cloud/*` selection only works inside a current Cline build that
+authenticates as a product surface. Anywhere else — scripts, older builds, third-party clients —
+you must select the `deepseek/*` equivalent.
 
 ## Observed failure modes
 
 | Request                                           | Result                                                          |
 | ------------------------------------------------- | --------------------------------------------------------------- |
-| `deepseek/deepseek-v4.1-flash`                    | `200` — works                                                   |
-| `deepseek/deepseek-v4.1-flash-1017`               | `200` — works (Fireworks upstream)                              |
+| `deepseek/deepseek-v4.1-flash`                    | `200` — works, 3/3                                              |
+| `deepseek/deepseek-v4.1-flash-1017`               | `200` — works, 3/3 (Fireworks upstream)                         |
 | `~deepseek/deepseek-flash-latest`                 | `200` — works                                                   |
+| `deepseek/deepseek-v4-pro`                        | `200` — works                                                   |
+| `~deepseek/deepseek-pro-latest`                   | `200` — works                                                   |
+| `deepseek/deepseek-v3.2`                          | `200` — works                                                   |
 | `deepseek/does-not-exist`                         | `404 {"error":"model not found","success":false}`               |
 | `nonexistent/model-xyz`                           | `404 {"error":"model not found","success":false}`               |
 | `deepseek-flash` (on the Cline gateway)           | `400 invalid model format. Expected format: modelType/model`     |
 | `deepseek/deepseek-flash-latest` (no `~`)         | `400 ... is not a valid model ID`                                |
+| `deepseek/deepseek-v4.1-flash:batch`              | `500 inference request failed ... from Openrouter`              |
 | `deepseek/deepseek-v4-flash`                      | `403 ... only available via Cline product surfaces`             |
-| `cline-cloud/deepseek-v4.1-flash`                 | `403 ... only available via Cline product surfaces`             |
+| `cline-cloud/deepseek-v4.1-flash`                 | `403 ... only available via Cline product surfaces`, 3/3        |
 
-The `404 model not found` row is the one the client turns into
+The `404 model not found` row and the `403 ... product surfaces` row are both turned into
 "It may not exist or you may not have access to it."
+
+### Picking a model that actually authenticates
+
+```
+Is the ID a cline-cloud/* one?
+├─ yes → it is gate-locked. Swap to the deepseek/* equivalent:
+│         cline-cloud/deepseek-v4.1-flash → deepseek/deepseek-v4.1-flash
+│         (or update the Cline client so it authenticates as a product surface)
+└─ no  → does the gateway list it?   curl https://api.cline.bot/api/v1/models
+          ├─ no  → stale client catalog: update / refresh the client
+          └─ yes → is it 403? entitlement (ClinePass/credits) — check the billing message
+                   is it 200? then the failing call is using a different provider base URL,
+                             most often DeepSeek direct, which needs `deepseek-flash`
+```
 
 ## Fix checklist
 
