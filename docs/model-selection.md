@@ -146,6 +146,9 @@ For Claude Code there are two options:
 
 Setup for both, plus verification steps: [`claude-code-setup.md`](./claude-code-setup.md).
 
+For **Cline itself** on an OpenAI-compatible gateway, no bridge is involved at all — use Cline's
+`OpenAI Compatible` provider: [`cline-with-anymodel.md`](./cline-with-anymodel.md).
+
 ## Reproducing the checks
 
 ```bash
