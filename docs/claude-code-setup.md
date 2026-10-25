@@ -1,13 +1,55 @@
 # Cline's DeepSeek model inside Claude Code
 
-Goal: run the **Claude Code** CLI, but have it talk to **Cline's** DeepSeek model
-(`deepseek/deepseek-v4.1-flash`) rather than Anthropic's models.
+Goal: run the **Claude Code** CLI on DeepSeek (V4.1 Flash) instead of Anthropic's models.
 
-## The constraint that shapes the solution
+There are two ways, and only one of them needs a bridge.
+
+## Option A — hosted Anthropic-compatible gateway (no bridge)
+
+If your gateway speaks the Anthropic Messages protocol itself, you only need `settings.json`. No
+proxy, no local process. [AnyModel](https://anymodel.org) is one such gateway: it resells Claude,
+GPT, Gemini, DeepSeek and others behind a single key and offers an Anthropic endpoint for Claude
+Code. Its own installer writes exactly this to `~/.claude/settings.json`:
+
+```json
+{
+  "hasCompletedOnboarding": true,
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://anymodel.org/v1",
+    "ANTHROPIC_AUTH_TOKEN": "your-anymodel-api-key",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-8",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-6",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-haiku-4-5-20251001"
+  }
+}
+```
+
+Two details from that file are worth copying into any hosted-gateway setup:
+
+- `"hasCompletedOnboarding": true` — skips the first-run wizard. Without it Claude Code can sit on
+  the login screen and never read your project-level `env` block.
+- `ANTHROPIC_BASE_URL` ends in `/v1`. Claude Code's normalisation means a base ending in `/v1`
+  gets `/messages` appended; a base like `https://api.deepseek.com/anthropic` gets `/v1/messages`
+  appended. Getting that suffix wrong is the usual cause of a 404 on the messages route.
+
+To point the model at DeepSeek, replace the three `*_MODEL` values with the id from AnyModel's
+models page. Its ids are `<provider-prefix>/<model>`, e.g. `cc/claude-opus-5-5`,
+`cx/gpt-6-astra`, `glm/glm-5.3-flash`. Add `ANTHROPIC_MODEL` with the same id to pin the main model.
+
+AnyModel's own one-liner does the write for you:
+
+```sh
+bash <(curl -fsSL "https://anymodel.org/i?tool=claude&model=<model-id>") <YOUR_API_KEY>
+```
+
+The catch: this route bills **AnyModel**, not Cline. It is DeepSeek, but it is not Cline's routing or
+balance. If that distinction matters, use Option B.
+
+## Option B — Cline's own gateway (bridge required)
 
 Claude Code speaks the **Anthropic Messages** protocol (`POST /v1/messages`). The Cline API is
 OpenAI-compatible only. Its own docs say: *"Programmatic access to AI models through an
-OpenAI-compatible Chat Completions API."* Every Anthropic path on the gateway is a 404:
+OpenAI-compatible Chat Completions API."* Every Anthropic path on that gateway is a 404:
 
 ```
 POST https://api.cline.bot/api/v1/chat/completions  → 200
@@ -18,13 +60,14 @@ POST https://api.cline.bot/api/anthropic/v1/messages→ 404
 POST https://api.cline.bot/api/v1/anthropic/v1/messages → 404
 ```
 
-So there is no `settings.json` that makes Claude Code talk to Cline directly. You need a tiny
-protocol bridge in between. This repo ships one:
+So *for Cline's gateway* there is no `settings.json` that works directly; you need a protocol bridge.
+This repo ships one:
 
 ```
 Claude Code ──Anthropic──▶ anthropic_cline_proxy.py ──OpenAI──▶ api.cline.bot ──▶ deepseek-v4.1-flash
             :8787                                     /api/v1/chat/completions
 ```
+
 
 **Why is the URL `127.0.0.1:8787` and not `api.cline.bot`?**
 
@@ -52,6 +95,8 @@ The one thing you cannot do is put `api.cline.bot` in `ANTHROPIC_BASE_URL` direc
 | `http://127.0.0.1:8787` (bridge running) | `POST /v1/messages` | `200` — bridge forwards to Cline |
 
 ## Step 1 — get a Cline API key
+
+Only needed for Option B.
 
 1. Sign in at `https://app.cline.bot`
 2. **Settings → API Keys → Create new API key**
@@ -162,10 +207,13 @@ Two behaviours worth knowing, both handled by the bridge:
 | `400 invalid model format. Expected format: modelType/model` | Bare id forwarded to the gateway | Let the bridge alias it, or pass `vendor/model` |
 | Replies look truncated | `max_tokens` too small for the reasoning phase | Raise it, or set `CLINE_REASONING_EFFORT` |
 
-## Alternative: skip Cline, use DeepSeek directly
+## Alternative: no Cline at all
 
-If you do not need Cline's billing/routing, DeepSeek exposes a native Anthropic endpoint and no
-bridge is required:
+Two ways to drop Cline's gateway entirely:
+
+1. **Hosted Anthropic-compatible gateway** — see Option A above (AnyModel and similar). Nothing to
+   run locally; the gateway holds the DeepSeek relationship and bills you directly.
+2. **DeepSeek's own Anthropic endpoint** — needs no bridge either:
 
 ```json
 {

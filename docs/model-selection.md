@@ -137,10 +137,12 @@ cannot use it directly, and no `cline-cloud/*` id will help.
 
 For Claude Code there are two options:
 
+- **A hosted Anthropic-compatible gateway** (e.g. `https://anymodel.org/v1`) — speaks the Anthropic
+  protocol directly, so `settings.json` alone is enough and **no bridge is needed**. Billing goes to
+  that gateway, not Cline.
 - **Cline's model via a local bridge** — `scripts/anthropic_cline_proxy.py` translates Anthropic
-  `/v1/messages` to the gateway's `/chat/completions`. This is the way to keep using Cline billing.
-- **DeepSeek directly** — `https://api.deepseek.com/anthropic` speaks Anthropic natively, with model
-  `deepseek-flash`, and needs no bridge.
+  `/v1/messages` to the gateway's `/chat/completions`. Needed only if you want Cline's routing and
+  balance; there is no Anthropic endpoint on `api.cline.bot` to point at.
 
 Setup for both, plus verification steps: [`claude-code-setup.md`](./claude-code-setup.md).
 
