@@ -129,6 +129,15 @@ Is the ID a cline-cloud/* one?
    "you have reached your … clinepass limit …"). Seeing one of those is a billing issue, not a
    model-ID issue.
 
+## Using the model outside Cline
+
+The Cline gateway is OpenAI-compatible only — `POST https://api.cline.bot/api/v1/messages` returns
+`404`, so Anthropic-protocol clients (Claude Code, the Anthropic SDK) cannot use it or any
+`cline-cloud/*` ID. Use DeepSeek's Anthropic-compatible endpoint instead:
+`https://api.deepseek.com/anthropic` with model `deepseek-flash`.
+
+Setup, `settings.json` recipes and verification steps: [`claude-code-setup.md`](./claude-code-setup.md).
+
 ## Reproducing the checks
 
 ```bash
