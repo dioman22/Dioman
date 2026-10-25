@@ -36,6 +36,7 @@ TIMEOUT = float(os.environ.get("CLINE_TIMEOUT", "600"))
 # Forward the model's reasoning as Anthropic "thinking" blocks. Off by default: unsigned
 # thinking blocks are not universally accepted by clients, and the text is redundant.
 FORWARD_REASONING = os.environ.get("PROXY_FORWARD_REASONING", "") == "1"
+DEBUG = os.environ.get("PROXY_DEBUG", "") == "1"
 
 # Friendly names -> Cline's vendor/model ids. Anything containing a "/" is passed through,
 # everything else falls back to DEFAULT_MODEL.
@@ -369,11 +370,17 @@ def call_upstream(body):
     request.add_header("Accept", "text/event-stream" if body.get("stream") else "application/json")
     if UPSTREAM_KEY:
         request.add_header("Authorization", "Bearer " + UPSTREAM_KEY)
+    if DEBUG:
+        sys.stderr.write("[proxy] -> POST %s/chat/completions  model=%s  stream=%s  key=%s\n"
+                         % (UPSTREAM_BASE, body.get("model"), body.get("stream"),
+                            "yes" if UPSTREAM_KEY else "none"))
+        sys.stderr.flush()
     return urllib.request.urlopen(request, timeout=TIMEOUT)
 
 
 def iter_upstream_chunks(response):
     """Yield decoded OpenAI SSE chunks from the upstream streaming response."""
+    first = True
     for raw in response:
         line = raw.decode("utf-8", "replace").strip()
         if not line or line.startswith(":"):
@@ -384,9 +391,15 @@ def iter_upstream_chunks(response):
         if data == "[DONE]":
             return
         try:
-            yield json.loads(data)
+            chunk = json.loads(data)
         except Exception:
             continue
+        if DEBUG and first:
+            sys.stderr.write("[proxy] <- upstream says id=%s model=%s\n"
+                             % (chunk.get("id"), chunk.get("model")))
+            sys.stderr.flush()
+            first = False
+        yield chunk
 
 
 def assemble(events):

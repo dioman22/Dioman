@@ -26,6 +26,31 @@ Claude Code ──Anthropic──▶ anthropic_cline_proxy.py ──OpenAI──
             :8787                                     /api/v1/chat/completions
 ```
 
+**Why is the URL `127.0.0.1:8787` and not `api.cline.bot`?**
+
+Because the two ends of that settings line are different things. `ANTHROPIC_BASE_URL` is the address
+Claude Code *sends to*, and Claude Code can only send Anthropic-format requests. `api.cline.bot` does
+not accept that format (404), so it cannot be the value. The bridge listens on `127.0.0.1:8787`,
+accepts the Anthropic request, and forwards it to `api.cline.bot/api/v1/chat/completions` in OpenAI
+format. The model is still Cline's — localhost is only the adapter's door.
+
+You can watch the actual upstream traffic with `PROXY_DEBUG=1`:
+
+```
+[proxy] -> POST https://api.cline.bot/api/v1/chat/completions  model=deepseek/deepseek-v4.1-flash  stream=True  key=yes
+[proxy] <- upstream says id=gen_01M5RGSRSEF9BY3JEZQADQBEQ4 model=deepseek/deepseek-v4.1-flash
+```
+
+The `gen_…` id is Cline's own gateway generation id — the same one a direct `curl` to `api.cline.bot`
+returns. The `model=` is Cline's `vendor/model` id, not anything the bridge invented.
+
+The one thing you cannot do is put `api.cline.bot` in `ANTHROPIC_BASE_URL` directly:
+
+| `ANTHROPIC_BASE_URL` | What Claude Code sends | Result |
+| --- | --- | --- |
+| `https://api.cline.bot/api/v1` | `POST /v1/messages` | `404` — endpoint does not exist |
+| `http://127.0.0.1:8787` (bridge running) | `POST /v1/messages` | `200` — bridge forwards to Cline |
+
 ## Step 1 — get a Cline API key
 
 1. Sign in at `https://app.cline.bot`
@@ -51,6 +76,7 @@ Useful options, all environment variables:
 | `PROXY_PORT` / `PROXY_HOST` | `8787` / `127.0.0.1` | Listen address |
 | `CLINE_REASONING_EFFORT` | *(empty)* | Passed through as `reasoning_effort` (e.g. `high`) |
 | `PROXY_FORWARD_REASONING` | `0` | `1` exposes the model's reasoning as Anthropic `thinking` blocks |
+| `PROXY_DEBUG` | `0` | `1` logs the upstream URL, model and Cline generation id |
 
 Sanity check:
 
