@@ -159,7 +159,7 @@ So:
 - Through the bridge, set `CLINE_MODEL` to whichever id you chose, e.g.
   `CLINE_MODEL=openrouter/free`.
 
-
+## Using the model outside Cline
 
 The Cline gateway is OpenAI-compatible only — `POST https://api.cline.bot/api/v1/messages` and every
 other Anthropic path return `404`, so Anthropic-protocol clients (Claude Code, the Anthropic SDK)
