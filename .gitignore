@@ -1,0 +1,12 @@
+.deps/
+build/
+build-*/
+cmake-build-*/
+*.o
+*.a
+*.so
+*.dylib
+*.vst3/
+!vst3-container/tests/fixtures/**/*.vst3/
+.DS_Store
+compile_commands.json
