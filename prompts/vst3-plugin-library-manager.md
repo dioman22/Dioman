@@ -52,11 +52,12 @@ screenshots or assets is not.
 
 ## 2. Long‑form prompt
 
-Fill the `INPUTS` block, then paste everything between the BEGIN/END markers. **Paste Appendix A
+Fill the `INPUTS` block, then paste everything between the BEGIN/END markers. **Paste Appendices A–F
 with it** — the phases cite `§A.3` (moduleinfo schema), `§A.4` (UIDs and `Compatibility`), `§A.5`
-(sub‑category strings) and `§A.6` (architecture matrix), and those sections exist so the agent does
-not reconstruct them wrongly from memory. Attach nothing else unless you have real bundles to test
-against; the agent generates its own fixtures (§E).
+(sub‑category strings), `§A.6` (architecture matrix) and `§F` (turning the result into a real
+double‑clickable Windows `.exe`), and those sections exist so the agent does not reconstruct them
+wrongly from memory. Attach nothing else unless you have real bundles to test against; the agent
+generates its own fixtures (§E).
 
 ----- BEGIN PROMPT -----
 
@@ -111,6 +112,7 @@ ALSO_SUPPORT:        <Bitwig / Cubase-Nuendo / FL Studio / Studio One-Studio Pro
 HOST_STACK:          <default: Tauri 2 (Rust core) + TypeScript UI + SQLite>
 UI_FRAMEWORK:        <default: React + Vite with a virtualized grid>
 PACKAGING:           <notarized dmg / signed MSI or NSIS / both>
+DELIVERY:            <portable single-file .exe / Setup.exe + MSI / both>   # see Appendix F
 TELEMETRY:           none
 TEST_LIBRARY:        <path to real .vst3 folders you may scan, or "none — generate fixtures">
 SCOPE_DEADLINE:      <e.g. "REAPER + Ableton only, 3 weeks">
@@ -566,6 +568,9 @@ Each item must be demonstrated with command output or a recording, not asserted.
     unsupported status — and the status matches what the acceptance run actually observed.
 12. `--rebuild` from an empty DB reproduces the same index as an incremental scan (same UIDs, same
     bundle rows, same overrides applied).
+13. The shippable artifact is a real Windows `.exe` (Appendix F): on a fresh VM with no dev tools and no
+    admin rights the portable binary scans, renders the grid and inserts into REAPER; the installer
+    uninstalls to zero residue; overrides and key bindings survive uninstall → reinstall.
 
 ### THINGS THAT WILL MAKE YOU WRONG (read twice)
 
@@ -1130,13 +1135,115 @@ third‑party vendor's plugin binary.
   each supported DAW. Record the host version in the test output.
 - `perf` — cold/warm scan, 1,500‑card render, hotkey→insert latency; fail the build on regression >20%.
 
-**E.5 What "done" looks like for a phase.** A single command that produces the phase's evidence:
-`./scripts/evidence/phase-N.sh` → logs + JSON + timings, committed under `evidence/`. This is how the
-acceptance criteria get proven instead of claimed.
-
-**E.6 What "done" looks like for a phase.** A single command produces the phase's evidence:
+**E.5 Evidence, not claims.** A single command produces each phase's evidence:
 `./scripts/evidence/phase-N.sh` → logs + JSON + timings, committed under `evidence/`. That is how
 acceptance criteria get *proven* instead of claimed, and how the next phase starts from facts.
+
+## Appendix F — Shipping it as a real Windows `.exe`
+
+This appendix exists because the requirement is usually stated as *"it has to work like a program, not a
+web page"*. Take that literally: **a browser cannot do this job.** It cannot enumerate
+`%ProgramFiles%\Common Files\VST3`, cannot load a plugin, cannot read a DAW's project file, and cannot
+synthesize a keystroke into another application. If the deliverable is a website, the honest scope is the
+catalogue in Variant 3. If the deliverable is the product described in §2, it must be a native
+executable — and that has its own build, packaging and trust rules.
+
+### F.1 Decide the artifact before you write code
+
+| Artifact | Use case | Notes |
+|---|---|---|
+| `Setup.exe` (NSIS) | normal install, Start‑menu entry, auto‑update | needs a signature, writes an uninstall entry |
+| `.msi` (WiX) | managed/enterprise deployment | more work, worth it only if asked |
+| **portable single‑file `VST3Manager.exe`** | USB stick, no install, "just runs" | hardest to get right, most loved by users |
+| sidecars `vst3idx.exe`, `vst3host.exe` | CLI + plugin helper | **must stay real files on disk** (F.4) |
+
+Portable mode: detect it with a `portable.flag` file next to the exe; then store the SQLite DB, images and
+logs in `.\data\`, falling back to `%LOCALAPPDATA%\<App>\` when the directory is read‑only (Program Files,
+a locked USB, a read‑only share). Never write to the exe's own directory without checking first.
+
+### F.2 Stack, chosen with `.exe` in mind
+
+- **Tauri 2 → `x86_64-pc-windows-msvc`** — recommended: ~10 MB app, native file dialogs, real global
+  hotkeys, native tray, WebView2 for the grid. Small enough that a portable build is believable.
+- **Electron** — fastest to a working UI, 150 MB+, ships Chromium. Fine if you already know it; the
+  sidecar/portable story is messier and startup is slower, which matters for a hotkey‑summoned tool.
+- **Native (.NET/WinUI, Qt)** — best OS integration (UIA, hotkeys, tray), slowest path to a good grid.
+- **Build it on Windows, or in CI on Windows.** Do not plan to produce the `.exe` on Linux as an
+  afterthought: you need the MSVC toolchain, the WebView2 SDK, and a Windows machine to test UI
+  automation anyway. A GitHub Actions `windows-latest` job that uploads the installer + portable zip on
+  every tag is the difference between "it builds for me" and "it ships".
+- Keep the core (scanner, DB, adapters) in Rust or Go behind the UI, so the CLI sidecars and the GUI are
+  the same code — not two implementations that drift.
+
+### F.3 WebView2 (the one dependency people forget)
+
+- Windows 10/11 normally has the Evergreen WebView2 runtime, but not always (LTSC, Server, N editions,
+  freshly imaged machines, some VMs). Check at startup and fail with a readable dialog + download link —
+  never a white window.
+- Installer: Evergreen bootstrapper (small, needs network once) or fixed‑version runtime (+~150 MB, works
+  offline). Portable build: prefer fixed‑version or document the prerequisite loudly.
+- Test on a clean Windows 10 VM with no dev tools installed. That single test catches most "it works on my
+  machine" packaging bugs.
+
+### F.4 The helper must remain a real process
+
+Single‑file packaging tempts you to embed everything. **Do not embed the host helper.** It has to be a
+real `.exe` on disk, because the whole isolation model depends on spawning it, timing it out and killing
+it. Declare `vst3host.exe` as an external binary/resource, extract to
+`%LOCALAPPDATA%\<App>\bin\<version>\` on first run, verify its hash, and start it from there. Same for the
+REAPER script and any other sidecar. If extraction is impossible (locked temp, AV quarantine), say so
+explicitly and degrade to "browse only" instead of pretending to insert.
+
+### F.5 Manifest and elevation
+
+- Request **`asInvoker`**, never `requireAdministrator`. An elevated app cannot drive a non‑elevated DAW
+  through UIA, and an elevated DAW cannot be driven by a non‑elevated app — the mismatch is the bug.
+- Default to a **per‑user** install (`%LOCALAPPDATA%\Programs\<App>`), with per‑machine as an option that
+  warns about the elevation mismatch above.
+- Write the uninstall manifest as you install (files, registry keys, DAW scripts) so Phase 9.4 can be
+  honest. Add/Remove Programs entry with the app's real icon and version.
+
+### F.6 Signing, SmartScreen and antivirus
+
+- Sign `Setup.exe`, the app exe **and both sidecars** with the same certificate. An unsigned binary that
+  also synthesizes keystrokes is a textbook AV false‑positive and a SmartScreen warning on every download.
+- **Do not pack or crypt the executable** (UPX and friends). That is what malware does; it will get you
+  flagged by reputation systems you cannot appeal to quickly.
+- Start building download reputation early — the certificate is not the same thing as reputation. Document
+  "how to verify our signature" in the README for the cautious user.
+- A downloaded portable exe carries Mark‑of‑the‑Web. Loading plugins from it is fine, but spawning sidecars
+  out of a temp path can be blocked; installing to a stable path avoids it. Test with MOTW present
+  (`Unblock-File` off).
+
+### F.7 Single instance, tray, and a CLI on the same binary
+
+- Single‑instance lock per user session; a second launch focuses the existing window instead of starting a
+  second scanner.
+- Accept arguments on the shipped exe so scriptability is free: `--scan`, `--verify --json`,
+  `--insert-uid <CID>`, `--doctor`, `--portable`. The evidence scripts (§E.5) drive **the shipped binary**,
+  not a dev build — that is what makes the acceptance criteria mean something.
+- Tray icon with "rescan", "pause hotkeys", "quit", and a visible paused state so the user can stop the
+  keyboard listener without uninstalling anything.
+
+### F.8 Acceptance for the `.exe` itself
+
+- Fresh Windows 10 VM, no dev tools, no WebView2 preinstalled: double‑click the portable exe → scan → grid
+  → insert into REAPER, **with no admin prompt at any point**.
+- Runs from `C:\Users\Jörg\Müzik Tools\App.exe` (spaces and non‑ASCII in the path), and from a read‑only
+  folder in portable mode (falls back to `%LOCALAPPDATA%` and says so).
+- Second launch focuses the first window; `--scan --json` works headlessly and exits non‑zero on failure.
+- `Setup.exe` installs per‑user, uninstalls to zero residue (files, registry keys, DAW scripts), and the app
+  still works if the DAW is installed later.
+- Signature valid on all binaries; AV clean on VirusTotal, or the false positives documented and appealed.
+- **Uninstall → reinstall keeps overrides and key bindings.** That only works if they live in
+  `%APPDATA%` (UID‑keyed, per §C.1) and not inside the install directory — a small schema decision with a
+  large user‑visible consequence.
+
+### F.9 If you actually meant "`.exe` plugins"
+
+If the requirement was "index my `.exe` files" rather than "give me an `.exe`", you are not building this
+product — see Variant 6, which defines that scope and its safety rules. Ask before guessing: the two
+products share a grid and almost nothing else.
 
 ----- END PROMPT -----
 
@@ -1194,17 +1301,37 @@ clicks past, and make the app fully usable (browse, search, health) without eith
 5. **Extend later, not now.** ARA, CLAP, AU and VST2 each reopen the scope you just closed. If you ever
    add AU, note that Logic becomes reachable — and that the metadata model changes completely (`.component`
    bundles, `AudioComponents` plist entries, different UIDs), which is why it is a v2, not a flag.
+6. **Loose `.exe` files instead of `.vst3` bundles — only if that is genuinely what you meant.** Then the
+   scanner targets Windows PE binaries and must **classify before it acts**, because executing an unknown
+   `.exe` is a security decision, not a UI action:
+   - **Installer** (Inno Setup, NSIS, MSI/WiX, InstallShield) — detect by resource signatures. Action:
+     extract and inspect first (`innoextract`, `lessmsi`, `7z`), or run silently (`/S`, `/SILENT`,
+     `/VERYSILENT`, `/qn`) **only after explicit confirmation**, showing signer, SHA‑256 and MOTW state.
+   - **Standalone build of a plugin** — version resource plus audio‑API imports, no `Contents/` payload.
+     Action: launch, reveal in Explorer, pin.
+   - **Packed/loader wrapper** — small stub, high entropy, embedded archive. Action: say what it is, never
+     auto‑run (this is the case your `vst3-reverse-engineering-exe.md` prompt covers in depth).
+   - **Unrelated app** — anything that does not identify as audio. Action: hidden from the grid by default.
+   Signals to classify with: PE version resources (CompanyName/ProductName/FileVersion), the signer chain,
+   embedded `VST3`/vendor strings, and whether an extracted payload contains `Contents/<arch>/*.vst3`.
+   Default to **never execute**; extraction answers most questions without running anything. And be honest in
+   the product copy: that is a file manager with an installer, not a plugin library manager — nothing in it
+   can put a plugin on a track.
+
 
 ---
 
 ## How to use this prompt
 
-1. Fill `INPUTS`, pick a variant, and paste §2 plus Appendices A–E into a fresh session.
-2. Expect the agent to stop after Phase 0. Read `SCOPE.md` and the adapter interface — that is the
+1. Fill `INPUTS`, pick a variant, and paste §2 plus Appendices A–F into a fresh session.
+2. Decide the artifact from Appendix F on day one (`DELIVERY` in `INPUTS`). A desktop app nobody can
+   double‑click is not the product; if the target is a portable `.exe`, say so before Phase 1 so the
+   sidecar/DB paths are designed for it rather than retrofitted.
+3. Expect the agent to stop after Phase 0. Read `SCOPE.md` and the adapter interface — that is the
    cheapest place to disagree with it.
-3. Run the evidence script after each phase. If a phase's evidence is "it works on my machine", it is not
+4. Run the evidence script after each phase. If a phase's evidence is "it works on my machine", it is not
    done.
-4. Do not let it start Phase 5 before Phase 3's crash isolation passes 20/20. Everything downstream
+5. Do not let it start Phase 5 before Phase 3's crash isolation passes 20/20. Everything downstream
    assumes the UI cannot be killed by a plugin.
-5. When something is unsupported, keep it visible and labelled. The product's credibility is built out of
+6. When something is unsupported, keep it visible and labelled. The product's credibility is built out of
    the sentences it refuses to say.
