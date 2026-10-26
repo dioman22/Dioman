@@ -5,6 +5,11 @@ indexes only `.vst3` bundles, shows them as a visual grid, and inserts the one y
 DAW's selected track with a click or a single key** — plus the library‑health, hotkey, remote and
 project‑audit features that make such a tool worth keeping installed.
 
+> **Want it as a VST3 plugin instead of a desktop app?** Use
+> [`vst3-container-plugin.md`](./vst3-container-plugin.md). A plugin cannot insert into the DAW's
+> track, so that prompt builds a container whose editor is the same grid and which hosts the chosen
+> plugin inside itself — no installers, no per‑DAW adapters, works in every VST3 host.
+
 This is a *product* prompt, not a snippet request. It is written around three convictions, and the
 phases exist to enforce them:
 
