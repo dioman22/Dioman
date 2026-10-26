@@ -15,6 +15,11 @@ Three things make this prompt different from a generic "analyze this binary" ask
 
 Legal scope is part of the prompt, not a footnote — see [Scope](#scope-notes) at the bottom.
 
+**Artifact is an `.exe`?** Start with the companion
+[`vst3-reverse-engineering-exe.md`](./vst3-reverse-engineering-exe.md) instead: a Windows `.exe` may
+be an installer, a standalone build of the plugin, a packed container, or a loader — and the pivot
+changes completely. Use this file once you have the `.vst3`/`.dll` (or for the module case).
+
 ---
 
 ## 1. Compact version (quick triage, ~15 lines)
@@ -531,6 +536,9 @@ academic study, and learning DSP technique. Keep it inside these lines:
 - **Suspected malware / supply-chain review:** add static IOC extraction, imported-API triage,
   network-string review, and a sandboxed dynamic run *before* Phase 3; do not host it on a machine
   with credentials.
+- **Your artifact is a Windows `.exe`** (installer, standalone build, packed container, loader):
+  use [`vst3-reverse-engineering-exe.md`](./vst3-reverse-engineering-exe.md) — it starts with case
+  triage and gives the audio-callback and bindiff recipes this file assumes you do not need.
 
 
 
