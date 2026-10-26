@@ -11,7 +11,9 @@
 #include <vector>
 
 #ifndef CRATE_FIXTURE_DIR
-#define CRATE_FIXTURE_DIR "tests/fixtures"
+// When no build-system override is given, resolve the fixture directory relative to
+// this header. Works both for in-tree compiles and absolute paths from CMake.
+#define CRATE_FIXTURE_DIR crate::fs::parentPath (__FILE__) + "/fixtures"
 #endif
 
 namespace crate::test {

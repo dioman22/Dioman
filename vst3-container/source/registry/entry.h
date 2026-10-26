@@ -27,6 +27,7 @@ const char* toString (Resolution r);
 enum class Status
 {
 	Ok,
+	Ready,           ///< metadata resolved, ready to load (not loaded yet)
 	Unknown,         ///< not probed yet
 	Unreadable,      ///< bundle or moduleinfo could not be read
 	Incompatible,    ///< architecture/channel layout cannot be hosted

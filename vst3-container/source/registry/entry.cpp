@@ -26,6 +26,8 @@ const char* toString (Status s)
 	{
 		case Status::Ok:
 			return "ok";
+		case Status::Ready:
+			return "ready";
 		case Status::Unknown:
 			return "unknown";
 		case Status::Unreadable:
@@ -52,6 +54,8 @@ const char* defaultStatusDetail (Status s)
 	{
 		case Status::Ok:
 			return "";
+		case Status::Ready:
+			return "Ready to load. This bundle has a readable moduleinfo.json.";
 		case Status::Unknown:
 			return "Not probed yet. The card is readable from the host's registry.";
 		case Status::Unreadable:
