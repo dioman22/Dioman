@@ -14,7 +14,9 @@ mkdir -p "${OUT}/obj"
 
 sources=()
 while IFS= read -r file; do sources+=("${file}"); done < <(
-	find "${ROOT}/source" "${ROOT}/tests" -name '*.cpp' | sort
+	# source/vst3 is the SDK-facing layer; it needs the Steinberg headers and is built by
+	# CMake only. Everything else must compile with nothing but a C++17 compiler.
+	find "${ROOT}/source" "${ROOT}/tests" -name '*.cpp' | grep -v '/source/vst3/' | sort
 )
 
 for file in "${sources[@]}"; do

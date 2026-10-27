@@ -11,6 +11,7 @@
 //    stopProcessing() implies setActive(false) and must be safe to call twice.
 #pragma once
 
+#include "../registry/entry.h"
 #include "audiotypes.h"
 
 #include <cstdint>
@@ -67,8 +68,7 @@ struct LoadResult
 {
 	std::unique_ptr<PluginInstance> instance;
 	std::string error;
-	/** registry::Status as text, so this header need not include the registry. */
-	const char* status = "unknown";
+	registry::Status status = registry::Status::Unknown;
 };
 
 /** Implemented by the VST3 layer. Only ever called on the message thread. */

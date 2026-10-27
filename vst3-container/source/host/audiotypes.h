@@ -16,6 +16,9 @@ namespace crate::host {
 /** Engine-side ceiling. The container itself negotiates 1..kMaxChannels channels. */
 constexpr int32_t kMaxChannels = 8;
 
+/** Slots in the container. Also the ceiling for the parameter map. */
+constexpr int32_t kMaxSlots = 8;
+
 /** Block size ceiling we are willing to pre-allocate for. */
 constexpr int32_t kMaxBlockSize = 4096;
 

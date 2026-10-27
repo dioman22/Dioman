@@ -19,7 +19,7 @@ namespace crate::host {
 class Chain
 {
 public:
-	static constexpr int32_t kMaxSlots = 8;
+	static constexpr int32_t kMaxSlots = crate::host::kMaxSlots;
 
 	Chain ();
 
