@@ -22,16 +22,7 @@ BEGIN_FACTORY (crate::vst3::kVendor, crate::vst3::kVendorUrl, crate::vst3::kVend
 	            crate::vst3::CrateController::createInstance)
 END_FACTORY
 
-#if SMTG_OS_WINDOWS
-extern "C" {
-SMTG_EXPORT_SYMBOL bool InitDll ()
-{
-	return true;
-}
-
-SMTG_EXPORT_SYMBOL bool ExitDll ()
-{
-	return true;
-}
-}
-#endif
+// The platform entry points (ModuleEntry/ModuleExit on Linux, InitDll/ExitDll on Windows)
+// and InitModule/DeinitModule come from the SDK's own main sources, which the SDK's CMake
+// adds to every plugin target. Do not define them here: a second definition is a link
+// error, and a missing one is a plugin no host can load.

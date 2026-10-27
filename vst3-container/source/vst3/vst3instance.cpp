@@ -160,14 +160,17 @@ bool Instance::load (const std::string& bundlePath, const std::string& uid,
 	processor_ = owned (processor);
 
 	// A single-component plugin implements the controller itself; a split plugin creates
-	// a second object through the factory.
+	// a second object, and that object has its *own* class ID — the processor CID will not
+	// find it in the factory.
 	IEditController* controller = nullptr;
 	if (component_->queryInterface (IEditController::iid, reinterpret_cast<void**> (&controller)) !=
 	        kResultOk ||
 	    !controller)
 	{
 		controller = nullptr;
-		if (factory->createInstance (classId, IEditController::iid,
+		TUID controllerCid {};
+		if (component_->getControllerClassId (controllerCid) == kResultOk &&
+		    factory->createInstance (controllerCid, IEditController::iid,
 		                             reinterpret_cast<void**> (&controller)) == kResultTrue &&
 		    controller)
 		{
@@ -185,6 +188,8 @@ bool Instance::load (const std::string& bundlePath, const std::string& uid,
 	inputChannels_ = component_->getBusCount (kAudio, kInput) > 0 ? channelCount (processor_, kInput) : 0;
 	outputChannels_ = channelCount (processor_, kOutput);
 
+	// Hosted plugins that refuse activation are a real failure; kNotImplemented from
+	// setState/getState only means "this plugin keeps no state".
 	if (component_->getBusCount (kAudio, kInput) > 0)
 		component_->activateBus (kAudio, kInput, 0, true);
 	if (component_->getBusCount (kAudio, kOutput) > 0)
@@ -244,7 +249,10 @@ bool Instance::startProcessing (const host::ProcessSetup& setup, std::string& er
 		error = "the plugin could not be activated";
 		return false;
 	}
-	if (processor_->setProcessing (true) != kResultOk)
+	// kNotImplemented is what every plugin derived from the SDK's AudioEffect returns
+	// here, so it means "nothing to do", not "failed".
+	const tresult processing = processor_->setProcessing (true);
+	if (processing != kResultOk && processing != kNotImplemented)
 	{
 		component_->setActive (false);
 		error = "the plugin could not start processing";

@@ -116,6 +116,21 @@ The engine tests use `tests/fake_plugin.h`: a fake plugin with real gain, real d
 optional failure and optional NaN output. If a test there fails, the bug is in the
 engine, not in a third-party plugin.
 
+When the SDK is available, `ctest -R crate_hosting_check` runs the integration check:
+`tests/integration/gainplugin.cpp` builds a fixture `.vst3` (gain 2.0, 32 samples of
+latency) and `tests/integration/hosting_check.cpp` loads it through the container's own
+state format and asserts that
+
+* the hosted gain is applied (0.25 in, 0.50 out),
+* the container reports the plugin's 32 samples of latency,
+* 50 % wet stays in phase (0.375 out) because the dry path is delayed by the latency,
+* bypass passes the dry signal,
+* a missing bundle degrades to pass-through instead of crashing or going silent,
+* saving and re-reading the state keeps the slot's UID and bundle path.
+
+That check is what catches SDK-API-level mistakes (wrong interface, wrong IID, a plugin
+class that cannot be found) that the SDK-free tests cannot see.
+
 ## Next milestone: the grid
 
 The pieces already exist — `RegistryService` returns the cards, `params` addresses the

@@ -165,6 +165,17 @@ tresult PLUGIN_API CrateProcessor::setActive (TBool state)
 	return AudioEffect::setActive (state);
 }
 
+tresult PLUGIN_API CrateProcessor::setProcessing (TBool state)
+{
+	if (!state)
+		active_ = false;
+	else if (prepared_)
+		active_ = true;
+	// kResultOk, not the SDK base class' kNotImplemented: we do track this state, and
+	// hosts are entitled to know that the call did something.
+	return kResultOk;
+}
+
 
 tresult PLUGIN_API CrateProcessor::process (ProcessData& data)
 {

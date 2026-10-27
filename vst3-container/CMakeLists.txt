@@ -142,7 +142,15 @@ if (CRATE_BUILD_PLUGIN)
 			source/vst3/vst3loader.cpp
 		)
 		target_include_directories (Crate PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/source)
-		target_link_libraries (Crate PRIVATE crate_core)
+		# `sdk` is the SDK's static library target: it carries pluginfactory.cpp,
+		# moduleinit.cpp (InitModule/DeinitModule) and stringconvert, and the platform main
+		# (ModuleEntry / InitDll) is added to our target by smtg_add_vst3plugin.
+		if (TARGET sdk)
+			target_link_libraries (Crate PRIVATE sdk crate_core)
+		else ()
+			target_link_libraries (Crate PRIVATE crate_core)
+			message (WARNING "The VST3 SDK did not define its 'sdk' target; linking only crate_core")
+		endif ()
 		target_compile_definitions (Crate PRIVATE CRATE_VERSION="${PROJECT_VERSION}")
 		set_target_properties (Crate PROPERTIES
 			CXX_VISIBILITY_PRESET hidden
@@ -152,6 +160,36 @@ if (CRATE_BUILD_PLUGIN)
 		# category instead of guessing from the binary.
 		if (COMMAND smtg_target_generate_moduleinfo)
 			smtg_target_generate_moduleinfo (Crate)
+		endif ()
+
+		# --- integration check -------------------------------------------------------
+		# A fixture plugin plus a program that loads it through the container's own state
+		# format. This is the only automated test that exercises Module::create, real
+		# IComponent/IAudioProcessor calls and the latency-compensated dry path together.
+		option (CRATE_BUILD_INTEGRATION_TESTS "Build the SDK-linked hosting integration check" ON)
+		if (CRATE_BUILD_INTEGRATION_TESTS)
+			smtg_add_vst3plugin (CrateGainFixture tests/integration/gainplugin.cpp)
+			target_include_directories (CrateGainFixture PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration)
+			if (TARGET sdk)
+				target_link_libraries (CrateGainFixture PRIVATE sdk)
+			endif ()
+
+			add_executable (crate_hosting_check tests/integration/hosting_check.cpp)
+			target_include_directories (crate_hosting_check PRIVATE
+				${CMAKE_CURRENT_SOURCE_DIR}/tests/integration
+				${CMAKE_CURRENT_SOURCE_DIR}/source)
+			target_link_libraries (crate_hosting_check PRIVATE crate_core)
+			if (TARGET sdk)
+				target_link_libraries (crate_hosting_check PRIVATE sdk)
+			endif ()
+			add_dependencies (crate_hosting_check CrateGainFixture)
+
+			get_target_property (_crate_fixture_bundle CrateGainFixture SMTG_PLUGIN_PACKAGE_PATH)
+			enable_testing ()
+			if (_crate_fixture_bundle)
+				add_test (NAME crate_hosting_check
+				          COMMAND crate_hosting_check "${_crate_fixture_bundle}")
+			endif ()
 		endif ()
 	else ()
 		message (STATUS "VST3 SDK not found (CRATE_VST3_SDK_DIR='${CRATE_VST3_SDK_DIR}').")
