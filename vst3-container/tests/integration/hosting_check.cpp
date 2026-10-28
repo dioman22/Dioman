@@ -14,6 +14,7 @@
 
 #include "pluginterfaces/base/smartpointer.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
+#include "pluginterfaces/vst/ivstpluginfactory.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
 #include "public.sdk/source/common/memorystream.h"
 #include "public.sdk/source/vst/hosting/module.h"
@@ -169,6 +170,33 @@ auto fixtureModule = VST3::Hosting::Module::create (bundlePath, fixtureModuleErr
 std::printf ("fixture module: %s (%s)\n", fixtureModule ? "loaded" : "FAILED",
              fixtureModuleError.c_str ());
 check (fixtureModule != nullptr, "fixture bundle can be loaded");
+if (fixtureModule)
+{
+    auto ff = fixtureModule->getFactory ().get ();
+    std::printf ("fixture classes: %d\n", (int)ff->countClasses ());
+    for (int32 i = 0; i < ff->countClasses (); ++i)
+    {
+        PClassInfo info {};
+        const tresult r1 = ff->getClassInfo (i, &info);
+        std::printf ("  [%d] getClassInfo=%d category=[%s] name=[%s] cid=", (int)i,
+                     (int)r1, info.category, info.name);
+        for (int b = 0; b < 16; ++b)
+            std::printf ("%02X", (unsigned char)info.cid[b]);
+        std::printf ("\n");
+        FUnknownPtr<IPluginFactory2> f2 (ff);
+        if (f2)
+        {
+            PClassInfo2 info2 {};
+            const tresult r2 = f2->getClassInfo2 (i, &info2);
+            std::printf ("  [%d] getClassInfo2=%d category=[%s] name=[%s] sub=[%s]\n",
+                         (int)i, (int)r2, info2.category, info2.name, info2.subCategories);
+        }
+        else
+        {
+            std::printf ("  [%d] no IPluginFactory2\n", (int)i);
+        }
+    }
+}
 
 	std::string containerPath = containerBundlePathFrom (bundlePath);
     std::printf ("container: %s\n", containerPath.c_str ());
