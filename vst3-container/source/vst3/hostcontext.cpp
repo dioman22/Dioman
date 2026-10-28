@@ -7,6 +7,7 @@ namespace crate::vst3 {
 
 using namespace Steinberg;
 using namespace Steinberg::Vst;
+using namespace VST3;
 
 tresult PLUGIN_API CrateHostApplication::getName (String128 name)
 {
