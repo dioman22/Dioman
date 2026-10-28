@@ -16,6 +16,7 @@
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
 #include "public.sdk/source/common/memorystream.h"
+#include "public.sdk/source/vst/hosting/module.h"
 
 #include "../../source/state/containerstate.h"
 
@@ -28,7 +29,15 @@
 using namespace Steinberg;
 using namespace Steinberg::Vst;
 
-IPluginFactory* GetPluginFactory ();
+// The container is loaded the way a host loads it, not by calling GetPluginFactory:
+// that symbol lives inside the .vst3 bundle and there is nothing to link against.
+std::string containerBundlePathFrom (const std::string& fixturePath)
+{
+    const size_t slash = fixturePath.find_last_of ("/\\");
+    const std::string folder =
+        slash == std::string::npos ? std::string () : fixturePath.substr (0, slash + 1);
+    return folder + "Crate.vst3";
+}
 
 namespace {
 
@@ -153,7 +162,16 @@ int main (int argc, char** argv)
 	const std::string bundlePath = argv[1];
 	std::printf ("fixture: %s\n", bundlePath.c_str ());
 
-	IPluginFactory* factory = GetPluginFactory ();
+	std::string containerPath = containerBundlePathFrom (bundlePath);
+    std::printf ("container: %s\n", containerPath.c_str ());
+    std::string moduleError;
+    auto module = VST3::Hosting::Module::create (containerPath, moduleError);
+    if (!module)
+    {
+        std::printf ("cannot load the container bundle: %s\n", moduleError.c_str ());
+        return 1;
+    }
+    IPluginFactory* factory = module->getFactory ().get ();
 	check (factory != nullptr, "container factory");
 	if (!factory)
 		return 1;
