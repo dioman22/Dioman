@@ -1,0 +1,151 @@
+# Builds Crate.vst3 with no toolchain on the developer's machine: CMake fetches the
+# Steinberg VST3 SDK itself, plus its four needed submodules. A tagged push attaches the
+# bundle to a GitHub Release, which is how it gets installed into a DAW.
+#
+# The core job needs no SDK at all and is the fast regression signal; the Windows job is
+# the one that produces the installable bundle.
+name: build-vst3
+
+on:
+  push:
+    branches:
+      - 'cline/**'
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+# The release step creates a Release, so the default read-only token is not enough.
+permissions:
+  contents: write
+
+env:
+  # Must be a real Steinberg tag: v<major>.<minor>.<patch>_build_<n>.
+  VST3_SDK_TAG: v3.7.11_build_10
+
+jobs:
+  # ---------------------------------------------------------------------------------
+  # The SDK-free suite: scripts/build-tests.sh compiles everything under source/ and
+  # tests/ except the SDK-facing layers (source/vst3, tests/integration) and runs it.
+  # ---------------------------------------------------------------------------------
+  core-tests:
+    name: core tests (SDK-free)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and run the SDK-free suite
+        run: bash vst3-container/scripts/build-tests.sh
+
+  # ---------------------------------------------------------------------------------
+  # The plug-in itself. Crate.vst3 is the deliverable; the integration check and the
+  # SDK validator are what stop a bundle that a host would blacklist from shipping.
+  # ---------------------------------------------------------------------------------
+  vst3-windows:
+    name: Crate.vst3 (windows x64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure (fetches the VST3 SDK and its submodules)
+        run: >-
+          cmake -S vst3-container -B build -A x64
+          -DCRATE_FETCH_VST3_SDK=ON
+          -DCRATE_VST3_SDK_TAG=${{ env.VST3_SDK_TAG }}
+
+      - name: Build the plug-in, the fixture plug-in and the tests
+        run: >-
+          cmake --build build --config Release
+          --target Crate crate_core CrateGainFixture crate_hosting_check crate_tests
+
+      - name: SDK-free unit suite
+        run: ctest --test-dir build -C Release -R crate_tests --output-on-failure
+
+      - name: Hosting integration check (loads a real bundle through the container)
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem build -Recurse -Filter crate_hosting_check.exe |
+                 Select-Object -First 1
+          $fixture = Get-ChildItem build -Recurse -Directory -Filter CrateGainFixture.vst3 |
+                     Select-Object -First 1
+          if (-not $exe)     { throw 'crate_hosting_check.exe was not built' }
+          if (-not $fixture) { throw 'the CrateGainFixture.vst3 bundle was not built' }
+          Write-Host "fixture bundle: $($fixture.FullName)"
+          & $exe.FullName $fixture.FullName
+          if ($LASTEXITCODE -ne 0) {
+            throw "hosting check failed with exit code $LASTEXITCODE"
+          }
+
+      - name: Build the SDK validator
+        continue-on-error: true
+        run: cmake --build build --config Release --target validator
+
+      - name: Validate Crate.vst3 (informational)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $plugin = Get-ChildItem build -Recurse -Directory -Filter Crate.vst3 |
+                    Select-Object -First 1
+          $validator = Get-ChildItem build -Recurse -Filter validator.exe |
+                       Select-Object -First 1
+          if (-not $plugin)    { throw 'Crate.vst3 was not built' }
+          if (-not $validator) { throw 'the SDK validator was not built' }
+          Write-Host "validating: $($plugin.FullName)"
+          & $validator.FullName $plugin.FullName
+
+      - name: Stage the bundle and write INSTALL.txt
+        shell: pwsh
+        run: |
+          $plugin = Get-ChildItem build -Recurse -Directory -Filter Crate.vst3 |
+                    Select-Object -First 1
+          if (-not $plugin) { throw 'Crate.vst3 was not built' }
+          $stage = Join-Path $env:RUNNER_TEMP 'crate-dist'
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item -Recurse $plugin.FullName $stage
+          $lines = @(
+            'Crate - VST3 plugin browser and container',
+            'built from branch cline/mbpp33tp',
+            '',
+            'Install:',
+            '  1. the Crate.vst3 folder in this archive goes into',
+            '     %ProgramFiles%\Common Files\VST3\',
+            '  2. rescan plugins in the DAW (a container that does not appear is',
+            '     almost always the wrong folder or a host that has not rescanned).',
+            '',
+            'What to expect at this stage:',
+            '  * the editor is not implemented yet (createView() returns nullptr), so the',
+            '    host shows its generic parameter list instead of the card grid;',
+            '  * audio passes through bit-transparent when no plugin is loaded;',
+            '  * a slot loads the plugins named in the session state, in series.'
+          )
+          $lines | Set-Content -Encoding utf8 (Join-Path $stage 'INSTALL.txt')
+          $zip = Join-Path $env:RUNNER_TEMP 'Crate-windows-x64.zip'
+          Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -Force
+          Write-Host "staged: $zip"
+          Get-ChildItem -Recurse $plugin.FullName | Select-Object -ExpandProperty FullName
+
+      - name: Hand the bundle to the run page
+        uses: actions/upload-artifact@v4
+        with:
+          name: Crate-windows-x64
+          path: ${{ runner.temp }}/Crate-windows-x64.zip
+          if-no-files-found: error
+
+      - name: Attach the bundle to the Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ runner.temp }}/Crate-windows-x64.zip
+          fail_on_unmatched_files: true
+          name: Crate ${{ github.ref_name }}
+          body: |
+            Crate.vst3 for 64-bit Windows, built from ${{ github.sha }}.
+
+            Install: unpack Crate.vst3 into `%ProgramFiles%\Common Files\VST3\`, then
+            rescan plugins in the DAW.
+
+            Known limitation at this stage: `createView()` returns `nullptr`, so the host
+            shows its generic parameter list instead of the card grid. The hosting engine,
+            registry readers, state codec and crash journal are in place and unit-tested.

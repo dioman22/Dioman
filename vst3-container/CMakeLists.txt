@@ -25,6 +25,10 @@ option(CRATE_BUILD_PLUGIN "Build the VST3 plugin (requires the VST3 SDK)" ON)
 option(CRATE_BUILD_TESTS "Build the SDK-free unit tests" ON)
 option(CRATE_FETCH_VST3_SDK "Fetch the VST3 SDK with FetchContent" OFF)
 set(CRATE_VST3_SDK_DIR "" CACHE PATH "Path to the VST3 SDK root (the folder holding public.sdk)")
+# Steinberg tags look like v<major>.<minor>.<patch>_build_<n>; the fetch below needs a real
+# one (v3.7.11 has build_10, not build_40). Override with -DCRATE_VST3_SDK_TAG=...
+set(CRATE_VST3_SDK_TAG "v3.7.11_build_10" CACHE STRING
+	"Steinberg VST3 SDK git tag fetched when CRATE_FETCH_VST3_SDK is ON")
 
 # --------------------------------------------------------------------------------------
 # Core library: registry readers, state codec, journal, engine. No SDK, no GUI, no audio
@@ -95,6 +99,12 @@ if (CRATE_BUILD_TESTS)
 	)
 	target_include_directories(crate_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 	target_link_libraries(crate_tests PRIVATE crate_core)
+	# Absolute, forward-slashed fixture path — the override tests/test_util.h already expects.
+	# Without it the header falls back to a path relative to __FILE__, which the Visual Studio
+	# generator records relative to the project files, so ctest (starting the binary in the
+	# build tree) would look for tests/fixtures in the wrong place.
+	target_compile_definitions(crate_tests PRIVATE
+		"CRATE_FIXTURE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures\"")
 	if (MSVC)
 		target_compile_options(crate_tests PRIVATE /W4)
 	else()
@@ -111,9 +121,18 @@ endif()
 if (CRATE_BUILD_PLUGIN)
 	if (CRATE_FETCH_VST3_SDK AND NOT CRATE_VST3_SDK_DIR)
 		include (FetchContent)
+		# Crate is raw-SDK: it never touches VSTGUI, and the vstgui4 submodule is not in the
+		# fetch list above, so VSTGUI support has to be off or the SDK's own CMake fails on
+		# the missing directory. The SDK's example plug-ins are dead weight here too.
+		if (NOT DEFINED SMTG_ENABLE_VSTGUI_SUPPORT)
+			set (SMTG_ENABLE_VSTGUI_SUPPORT OFF CACHE BOOL "VSTGUI is not used by Crate")
+		endif ()
+		if (NOT DEFINED SMTG_ENABLE_VST3_PLUGIN_EXAMPLES)
+			set (SMTG_ENABLE_VST3_PLUGIN_EXAMPLES OFF CACHE BOOL "Skip the SDK example plug-ins")
+		endif ()
 		FetchContent_Declare (vst3sdk
 			GIT_REPOSITORY https://github.com/steinbergmedia/vst3sdk.git
-			GIT_TAG v3.7.11_build_40
+			GIT_TAG ${CRATE_VST3_SDK_TAG}
 			GIT_SUBMODULES base pluginterfaces public.sdk cmake
 			GIT_SUBMODULES_RECURSE TRUE
 		)
