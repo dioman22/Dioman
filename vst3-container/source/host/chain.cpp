@@ -1,6 +1,7 @@
 #include "chain.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <limits>
 
 namespace crate::host {
@@ -73,6 +74,8 @@ bool Chain::prepare (const ProcessSetup& setup, std::string& error)
 	{
 		std::string slotError;
 		slots_[static_cast<size_t> (i)].prepare (setup, setup.numChannels, slotError);
+		if (!slotError.empty ())
+			std::fprintf (stderr, "crate: slot %d prepare said: %s\n", i, slotError.c_str ());
 	}
 	return true;
 }
