@@ -69,12 +69,13 @@ jobs:
         shell: pwsh
         timeout-minutes: 15
         run: |
-          ./.github/scripts/run-step.ps1 -- cmake -S vst3-container -B build -A x64 '-DCRATE_VST3_SDK_DIR=${{ runner.temp }}/vst3sdk'
+          ./.github/scripts/run-step.ps1 -Annotate -- cmake -S vst3-container -B build -A x64 '-DCRATE_VST3_SDK_DIR=${{ runner.temp }}/vst3sdk'
 
       - name: Build the plug-in, the fixture plug-in and the tests
         shell: pwsh
+        timeout-minutes: 30
         run: |
-          ./.github/scripts/run-step.ps1 -- cmake --build build --config Release --target Crate crate_core CrateGainFixture crate_hosting_check crate_tests
+          ./.github/scripts/run-step.ps1 -Annotate -- cmake --build build --config Release --target Crate crate_core CrateGainFixture crate_hosting_check crate_tests
 
       - name: SDK-free unit suite
         shell: pwsh

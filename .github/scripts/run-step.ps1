@@ -5,9 +5,15 @@
 # annotations can be read by anyone (GET /repos/{owner}/{repo}/check-runs/{id}/annotations).
 # Without this, a failed step reports nothing but "Process completed with exit code 1".
 #
+# With -Annotate the interesting lines are also surfaced as ::notice:: annotations *while*
+# the command runs, which is the only way to see where a step that never finishes has got
+# to.
+#
 # Usage (dot-source it so `exit` ends the step with the command's status):
-#   ./.github/scripts/run-step.ps1 cmake --build build --config Release
+#   ./.github/scripts/run-step.ps1 -Annotate -- cmake -S . -B build
 param(
+    [switch] $Annotate,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]] $Command
 )
@@ -26,10 +32,24 @@ if (-not $Command -or $Command.Count -eq 0) {
 $log = Join-Path $env:RUNNER_TEMP ('step-' + [guid]::NewGuid().ToString('N') + '.log')
 Write-Host "run-step: $($Command -join ' ')"
 
-if ($Command.Count -eq 1) {
+$arguments = if ($Command.Count -gt 1) { $Command[1..($Command.Count - 1)] } else { @() }
+
+if ($Annotate) {
+    $noticePattern = '^-- |^CMake (Error|Warning)|error:|fatal:|Cloning into|Submodule path|FAILED|ninja:'
+    $noticed = 0
+    & $Command[0] $arguments 2>&1 | ForEach-Object {
+        $line = $_.ToString()
+        Add-Content -Path $log -Value $line
+        Write-Host $line
+        if ($noticed -lt 45 -and $line -match $noticePattern) {
+            Write-Host "::notice::$line"
+            $noticed++
+        }
+    }
+} elseif ($Command.Count -eq 1) {
     & $Command[0] 2>&1 | Tee-Object -FilePath $log
 } else {
-    & $Command[0] $Command[1..($Command.Count - 1)] 2>&1 | Tee-Object -FilePath $log
+    & $Command[0] $arguments 2>&1 | Tee-Object -FilePath $log
 }
 
 $code = $LASTEXITCODE
