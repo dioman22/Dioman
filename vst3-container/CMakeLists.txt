@@ -172,6 +172,12 @@ if (CRATE_BUILD_PLUGIN)
 		if (COMMAND smtg_enable_vst3_sdk)
 			smtg_enable_vst3_sdk ()
 		endif ()
+		# smtg_target_add_library_main() silently does nothing when this is unset, which
+		# is exactly how a bundle ends up exporting GetPluginFactory alone.
+		if (NOT public_sdk_SOURCE_DIR)
+			message (FATAL_ERROR
+				"smtg_enable_vst3_sdk() did not set public_sdk_SOURCE_DIR; the platform main would be missing")
+		endif ()
 		if (NOT COMMAND smtg_target_add_library_main)
 			message (FATAL_ERROR
 				"The VST3 SDK at ${CRATE_VST3_SDK_DIR} did not provide smtg_target_add_library_main()")
