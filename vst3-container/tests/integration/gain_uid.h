@@ -18,25 +18,9 @@ constexpr uint32_t kGainUidLong2 = 0x55667788u;
 constexpr uint32_t kGainUidLong3 = 0x99AABBCCu;
 constexpr uint32_t kGainUidLong4 = 0xDDEEFF01u;
 
-/** The same id as 32 uppercase hex characters: the form the container stores. */
-inline std::string gainUidHex ()
-{
-	const uint32_t longs[4] = {kGainUidLong1, kGainUidLong2, kGainUidLong3, kGainUidLong4};
-	static const char* digits = "0123456789ABCDEF";
-	std::string out;
-	out.reserve (32);
-	for (int i = 0; i < 4; ++i)
-	{
-		for (int b = 0; b < 4; ++b)
-		{
-			const unsigned char byte =
-			    static_cast<unsigned char> ((longs[i] >> (8 * b)) & 0xFF);
-			out += digits[byte >> 4];
-			out += digits[byte & 0x0F];
-		}
-	}
-	return out;
-}
+/** The hex form the container compares against is read from the loaded bundle by the
+ *  integration check. FUID's byte layout is its own business, and guessing it here is
+ *  how the check and the fixture drifted apart in the first place. */
 
 /** Fixed plugin behaviour the integration check asserts. */
 constexpr float kGain = 2.0f;
