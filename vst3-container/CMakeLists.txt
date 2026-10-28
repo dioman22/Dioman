@@ -30,6 +30,17 @@ set(CRATE_VST3_SDK_DIR "" CACHE PATH "Path to the VST3 SDK root (the folder hold
 set(CRATE_VST3_SDK_TAG "v3.7.11_build_10" CACHE STRING
 	"Steinberg VST3 SDK git tag fetched when CRATE_FETCH_VST3_SDK is ON")
 
+# The editor needs VSTGUI, which the SDK carries as a submodule. The fetch in this project
+# only asks for the four submodules the plug-in itself links, so VSTGUI is fetched
+# separately at the commit the SDK pins. On Linux VSTGUI needs the X11/cairo/pango
+# development packages, so the editor defaults off there and the bundle stays a pure
+# parameter plugin rather than failing to configure.
+set(_crate_editor_default OFF)
+if(WIN32)
+	set(_crate_editor_default ON)
+endif()
+option(CRATE_BUILD_EDITOR "Build the card-grid editor (VSTGUI)" ${_crate_editor_default})
+
 # Crate is raw-SDK: it never touches VSTGUI. The SDK defaults both of these to ON, which
 # needs the vstgui4 submodule (the fetch below deliberately does not bring it in) and
 # builds the SDK's world of example plug-ins. Flip them once here, so that every way of
@@ -70,6 +81,7 @@ add_library(crate_core STATIC
 	source/registry/reaperreader.cpp
 	source/registry/registryservice.cpp
 	source/state/containerstate.cpp
+	source/ui/gridmodel.cpp
 	source/util/fs.cpp
 	source/util/search.cpp
 	source/util/stringutil.cpp
@@ -105,6 +117,7 @@ if (CRATE_BUILD_TESTS)
 		tests/test_app.cpp
 		tests/test_chain.cpp
 		tests/test_fl.cpp
+		tests/test_grid.cpp
 		tests/test_json.cpp
 		tests/test_live.cpp
 		tests/test_moduleinfo.cpp
@@ -183,6 +196,38 @@ if (CRATE_BUILD_PLUGIN)
 				"The VST3 SDK at ${CRATE_VST3_SDK_DIR} did not provide smtg_target_add_library_main()")
 		endif ()
 
+		# --- editor ------------------------------------------------------------------
+		set (_crate_editor_sources)
+		if (CRATE_BUILD_EDITOR)
+			include (FetchContent)
+			set (VSTGUI_DISABLE_UNITTESTS 1 CACHE INTERNAL "")
+			set (VSTGUI_STANDALONE_EXAMPLES OFF CACHE BOOL "" FORCE)
+			set (VSTGUI_STANDALONE ON CACHE BOOL "" FORCE)
+			set (VSTGUI_TOOLS OFF CACHE BOOL "" FORCE)
+			# The commit the SDK pins for its vstgui4 submodule.
+			FetchContent_Declare (vstgui
+				GIT_REPOSITORY https://github.com/steinbergmedia/vstgui.git
+				GIT_TAG 480b0c8d71a35e4280acf49b505ad64d3ee5bb79)
+			FetchContent_MakeAvailable (vstgui)
+			if (NOT TARGET vstgui OR NOT TARGET vstgui_uidescription)
+				message (FATAL_ERROR "VSTGUI did not provide its vstgui targets")
+			endif ()
+			# The SDK's own vstgui_support target, recreated because FetchContent has
+			# already added the VSTGUI directory and smtg_enable_vstgui_support would
+			# add it a second time.
+			add_library (crate_vstgui_support STATIC
+				${vstgui_SOURCE_DIR}/vstgui/plugin-bindings/vst3groupcontroller.cpp
+				${vstgui_SOURCE_DIR}/vstgui/plugin-bindings/vst3padcontroller.cpp
+				${vstgui_SOURCE_DIR}/vstgui/plugin-bindings/vst3editor.cpp
+				${public_sdk_SOURCE_DIR}/source/vst/vstguieditor.cpp)
+			target_include_directories (crate_vstgui_support PUBLIC
+				${vstgui_SOURCE_DIR} ${public_sdk_SOURCE_DIR})
+			target_link_libraries (crate_vstgui_support PUBLIC base vstgui_uidescription)
+			target_compile_definitions (crate_vstgui_support PUBLIC
+				VSTGUI_ENABLE_DEPRECATED_METHODS=1)
+			list (APPEND _crate_editor_sources source/vst3/crateeditor.cpp)
+		endif ()
+
 		# The hosting library leaves these two to the host application: the platform module
 # implementation that Module::create comes from, and the memory stream the state code
 # uses. The SDK validator compiles the same files for the same reason.
@@ -203,6 +248,7 @@ smtg_add_vst3plugin (Crate
 			source/vst3/hostcontext.cpp
 			source/vst3/vst3instance.cpp
 			source/vst3/vst3loader.cpp
+			${_crate_editor_sources}
     ${_crate_hosting_extra}
 		)
 		# A bundle that exports GetPluginFactory and nothing else loads on Windows (InitDll
@@ -224,6 +270,10 @@ smtg_add_vst3plugin (Crate
 			message (WARNING "The VST3 SDK did not define its 'sdk' target; linking only crate_core")
 		endif ()
 		target_compile_definitions (Crate PRIVATE CRATE_VERSION="${PROJECT_VERSION}")
+		if (CRATE_BUILD_EDITOR)
+			target_link_libraries (Crate PRIVATE crate_vstgui_support)
+			target_compile_definitions (Crate PRIVATE CRATE_HAS_EDITOR=1)
+		endif ()
 		set_target_properties (Crate PROPERTIES
 			CXX_VISIBILITY_PRESET hidden
 			VISIBILITY_INLINES_HIDDEN ON

@@ -1,5 +1,6 @@
 #include "crateprocessor.h"
 
+#include "messages.h"
 #include "pluginids.h"
 
 #include "../app/cratepaths.h"
@@ -402,6 +403,53 @@ tresult PLUGIN_API CrateProcessor::setState (IBStream* stream)
 	}
 
 	prepared_ = false;
+	return kResultOk;
+}
+
+
+tresult PLUGIN_API CrateProcessor::notify (IMessage* message)
+{
+	if (!message || !message->getMessageID ())
+		return kInvalidArgument;
+	if (std::strcmp (message->getMessageID (), messages::kLoadSlot) != 0)
+		return AudioEffect::notify (message);
+
+	IAttributeList* attributes = message->getAttributes ();
+	if (!attributes)
+		return kResultFalse;
+
+	int64 slotValue = -1;
+	if (attributes->getInt (messages::kSlot, slotValue) != kResultOk)
+		return kResultFalse;
+
+	host::SlotIdentity identity;
+	identity.uid = messages::getString (attributes, messages::kUid);
+	identity.name = messages::getString (attributes, messages::kName);
+	identity.vendor = messages::getString (attributes, messages::kVendor);
+	identity.version = messages::getString (attributes, messages::kVersion);
+	identity.bundlePath = messages::getString (attributes, messages::kPath);
+
+	std::string error;
+	const bool loaded =
+	    loadSlot (static_cast<int32_t> (slotValue), identity, error);
+
+	// The controller shows this sentence in the footer and, on success, tells the host
+	// that latency may have changed and that the project is dirty.
+	IPtr<IMessage> reply = owned (allocateMessage ());
+	if (reply)
+	{
+		reply->setMessageID (messages::kLoadResult);
+		IAttributeList* out = reply->getAttributes ();
+		if (out)
+		{
+			out->setInt (messages::kSlot, slotValue);
+			out->setInt (messages::kOk, loaded ? 1 : 0);
+			messages::setString (out, messages::kUid, identity.uid);
+			messages::setString (out, messages::kName, identity.name);
+			messages::setString (out, messages::kError, error);
+		}
+		sendMessage (reply);
+	}
 	return kResultOk;
 }
 

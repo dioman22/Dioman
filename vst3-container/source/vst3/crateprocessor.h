@@ -54,6 +54,10 @@ public:
 	Steinberg::tresult PLUGIN_API getState (Steinberg::IBStream* state) SMTG_OVERRIDE;
 	Steinberg::tresult PLUGIN_API setState (Steinberg::IBStream* state) SMTG_OVERRIDE;
 
+	/** Load request from our controller. Message thread; this is the only path that can
+	 *  change the chain, so the audio thread never sees a half-swapped slot. */
+	Steinberg::tresult PLUGIN_API notify (Steinberg::Vst::IMessage* message) SMTG_OVERRIDE;
+
 	OBJ_METHODS (CrateProcessor, Steinberg::Vst::AudioEffect)
 
 	/** Called by the controller when the user picks a plugin for a slot. Message thread.

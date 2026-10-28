@@ -1,12 +1,22 @@
 #include "cratecontroller.h"
 
+#include "messages.h"
+
+#if CRATE_HAS_EDITOR
+#include "crateeditor.h"
+#endif
+
+#include "../app/cratepaths.h"
 #include "../state/containerstate.h"
 #include "../util/stringutil.h"
 
 #include "pluginterfaces/base/ibstream.h"
+#include "pluginterfaces/vst/ivsthostapplication.h"
+#include "pluginterfaces/vst/ivstmessage.h"
 #include "public.sdk/source/vst/utility/stringconvert.h"
 
 #include <cstring>
+#include <string>
 #include <vector>
 
 namespace crate::vst3 {
@@ -166,8 +176,160 @@ FUnknown* CrateController::createInstance (void*)
 
 tresult PLUGIN_API CrateController::initialize (FUnknown* context)
 {
-	return EditController::initialize (context);
+	const tresult result = EditController::initialize (context);
+	if (result != kResultOk)
+		return result;
+
+	// Which registry to read is decided by the host we are running inside.
+	if (context)
+	{
+		IHostApplication* application = nullptr;
+		if (context->queryInterface (IHostApplication::iid,
+		                             reinterpret_cast<void**> (&application)) == kResultOk &&
+		    application)
+		{
+			IPtr<IHostApplication> held = owned (application);
+			String128 name {};
+			name[0] = 0;
+			if (held->getName (name) == kResultOk)
+				hostName_ = VST3::StringConvert::convert (name);
+		}
+	}
+	return kResultOk;
 }
+
+tresult PLUGIN_API CrateController::terminate ()
+{
+	editor_ = nullptr;
+	registry_.reset ();
+	entries_.clear ();
+	enriched_.clear ();
+	snapshot_ = registry::RegistrySnapshot ();
+	catalogueLoaded_ = false;
+	enrichCursor_ = 0;
+	catalogueRevision_ = 0;
+	return EditController::terminate ();
+}
+
+IPlugView* PLUGIN_API CrateController::createView (FIDString name)
+{
+#if CRATE_HAS_EDITOR
+	if (!name || std::strcmp (name, ViewType::kEditor) != 0)
+		return nullptr;
+
+	ensureCatalogue ();
+	auto* editor = new CrateEditor (this);
+	editor_ = editor;
+	return editor;
+#else
+	(void) name;
+	statusMessage_ = "this build has no editor; rebuild with -DCRATE_BUILD_EDITOR=ON";
+	return nullptr;
+#endif
+}
+
+tresult PLUGIN_API CrateController::notify (IMessage* message)
+{
+	if (!message || !message->getMessageID ())
+		return kInvalidArgument;
+	if (std::strcmp (message->getMessageID (), messages::kLoadResult) != 0)
+		return EditController::notify (message);
+
+	IAttributeList* attributes = message->getAttributes ();
+	if (!attributes)
+		return kResultFalse;
+
+	int64 ok = 0;
+	int64 slot = 0;
+	attributes->getInt (messages::kOk, ok);
+	attributes->getInt (messages::kSlot, slot);
+	const std::string name = messages::getString (attributes, messages::kName);
+	const std::string error = messages::getString (attributes, messages::kError);
+
+	if (ok)
+	{
+		statusMessage_ = "loaded " + (name.empty () ? std::string ("plugin") : name) +
+		                 " into slot " + std::to_string (slot + 1);
+		// The chain's latency changed, and the session now differs from the saved one.
+		if (componentHandler)
+			componentHandler->restartComponent (Vst::kLatencyChanged);
+		if (componentHandler2)
+			componentHandler2->setDirty (true);
+	}
+	else
+	{
+		statusMessage_ =
+		    error.empty () ? "the processor could not load that plugin" : error;
+	}
+
+	refreshEditor ();
+	return kResultOk;
+}
+
+void CrateController::ensureCatalogue ()
+{
+	if (catalogueLoaded_)
+		return;
+	catalogueLoaded_ = true;
+
+	registry_ = std::make_unique<registry::RegistryService> (hostName_, "",
+	                                                         app::dataDirectory ());
+	snapshot_ = registry_->load (false);
+	entries_ = snapshot_.entries;
+	enriched_.assign (entries_.size (), 0);
+	enrichCursor_ = 0;
+	++catalogueRevision_;
+
+	if (entries_.empty ())
+	{
+		statusMessage_ =
+		    snapshot_.stateDetail.empty ()
+		        ? "no plugin registry found for " +
+		              (hostName_.empty () ? std::string ("this host") : hostName_)
+		        : snapshot_.stateDetail;
+	}
+	else
+	{
+		statusMessage_ =
+		    "click a card to load it into slot " + std::to_string (selectedSlot_ + 1);
+	}
+}
+
+std::string CrateController::sourceLine () const
+{
+	if (!catalogueLoaded_)
+		return "reading the host's plugin registry";
+
+	std::string text =
+	    snapshot_.reader.empty () ? std::string ("host registry") : snapshot_.reader;
+	text += " · " + std::to_string (entries_.size ()) + " plugins";
+	if (snapshot_.readFromCopy)
+		text += " · read from a copy";
+	if (snapshot_.state != registry::ReaderState::Ok && !snapshot_.stateDetail.empty ())
+		text += " · " + snapshot_.stateDetail;
+	return text;
+}
+
+void CrateController::pumpEnrichment (int budget)
+{
+	if (!registry_ || enrichCursor_ >= entries_.size ())
+		return;
+
+	bool changed = false;
+	while (budget > 0 && enrichCursor_ < entries_.size ())
+	{
+		const size_t index = enrichCursor_++;
+		if (enriched_[index])
+			continue;
+		registry_->enrich (entries_[index]);
+		enriched_[index] = 1;
+		changed = true;
+		--budget;
+	}
+	if (changed)
+		++catalogueRevision_;
+}
+
 
 int32_t CrateController::selectedSlot () const
 {
@@ -185,6 +347,99 @@ void CrateController::setSelectedSlot (int32_t slot)
 	    host::params::toNormalised (host::params::kSelectedSlotId, static_cast<double> (slot));
 	setParamNormalized (host::params::kSelectedSlotId, value);
 }
+
+bool CrateController::loadEntry (const registry::Entry& entry, int slot, std::string& error)
+{
+	error.clear ();
+	if (!registry_)
+	{
+		error = "the plugin catalogue is not loaded";
+		statusMessage_ = error;
+		return false;
+	}
+	if (slot < 0 || slot >= host::kMaxSlots)
+	{
+		error = "slot index out of range";
+		statusMessage_ = error;
+		return false;
+	}
+	if (entry.name.empty ())
+	{
+		error = "that card has no name to resolve";
+		statusMessage_ = error;
+		return false;
+	}
+
+	// A card may still be unenriched (the timer resolves a few per tick). Resolve this
+	// one now: a click is allowed to touch the filesystem, a paint is not.
+	registry::Entry resolved = entry;
+	if (resolved.bundle.empty () || resolved.uid.empty ())
+		registry_->enrich (resolved);
+
+	if (resolved.bundle.empty ())
+	{
+		error = resolved.statusDetail.empty ()
+		            ? "could not find the bundle for " + resolved.name
+		            : resolved.name + ": " + resolved.statusDetail;
+		statusMessage_ = error;
+		return false;
+	}
+	if (!getPeer ())
+	{
+		error = "the host did not connect the processor and the controller";
+		statusMessage_ = error;
+		return false;
+	}
+
+	IPtr<IMessage> message = owned (allocateMessage ());
+	if (!message)
+	{
+		error = "could not allocate a load message";
+		statusMessage_ = error;
+		return false;
+	}
+	message->setMessageID (messages::kLoadSlot);
+
+	IAttributeList* attributes = message->getAttributes ();
+	if (!attributes)
+	{
+		error = "the load message has no attributes";
+		statusMessage_ = error;
+		return false;
+	}
+	attributes->setInt (messages::kSlot, slot);
+	messages::setString (attributes, messages::kUid, resolved.uid);
+	messages::setString (attributes, messages::kPath, resolved.bundle);
+	messages::setString (attributes, messages::kName, resolved.name);
+	messages::setString (attributes, messages::kVendor, resolved.vendor);
+	messages::setString (attributes, messages::kVersion, resolved.version);
+
+	statusMessage_ =
+	    "loading " + resolved.name + " into slot " + std::to_string (slot + 1) + "...";
+	const tresult sent = sendMessage (message);
+	if (sent != kResultOk)
+	{
+		error = "the host refused the load message";
+		statusMessage_ = error;
+		return false;
+	}
+	return true;
+}
+
+void CrateController::editorClosed (CrateEditor* editor)
+{
+	if (editor_ == editor)
+		editor_ = nullptr;
+}
+
+void CrateController::refreshEditor ()
+{
+#if CRATE_HAS_EDITOR
+	if (editor_)
+		editor_->refreshFromController ();
+#endif
+}
+
 
 tresult PLUGIN_API CrateController::setComponentState (IBStream* stream)
 {
