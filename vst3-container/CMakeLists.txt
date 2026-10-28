@@ -41,6 +41,12 @@ set(SMTG_ENABLE_VST3_PLUGIN_EXAMPLES OFF CACHE BOOL "Skip the SDK example plug-i
 # A .vst3 that someone installs must not depend on a Visual C++ Redistributable of the
 # exact toolchain version. /MT only affects MSVC; other platforms ignore the option.
 set(SMTG_USE_STATIC_CRT ON CACHE BOOL "Link the C runtime statically (/MT)")
+# The SDK flips its own targets to /MT with add_compile_options inside its directory,
+# so that never reaches targets created here. Both sides must agree or the link fails
+# with LNK2038 RuntimeLibrary mismatch.
+if (MSVC)
+	set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif ()
 
 # --------------------------------------------------------------------------------------
 # Core library: registry readers, state codec, journal, engine. No SDK, no GUI, no audio
