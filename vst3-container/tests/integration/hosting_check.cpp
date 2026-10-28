@@ -56,6 +56,36 @@ public:
 	uint32 PLUGIN_API release () override { return 1000; }
 };
 
+/** The fixture's class id, taken from the bundle that is about to be hosted: the
+ *  factory hands out exactly the bytes the container compares against, so no byte-order
+ *  assumption can be wrong here. */
+std::string fixtureUidHex (IPluginFactory* factory)
+{
+	if (!factory)
+		return std::string ();
+	static const char* digits = "0123456789ABCDEF";
+	for (int32 i = 0; i < factory->countClasses (); ++i)
+	{
+		PClassInfo info {};
+		if (factory->getClassInfo (i, &info) != kResultOk)
+			continue;
+		if (std::strcmp (info.category, kVstAudioEffectClass) != 0)
+			continue;
+		std::string out;
+		out.reserve (32);
+		for (int b = 0; b < 16; ++b)
+		{
+			const unsigned char byte = static_cast<unsigned char> (info.cid[b]);
+			out += digits[byte >> 4];
+			out += digits[byte & 0x0F];
+		}
+		return out;
+	}
+	return std::string ();
+}
+
+std::string gFixtureUid;
+
 int failures = 0;
 
 void check (bool ok, const char* what)
@@ -72,7 +102,7 @@ std::vector<uint8_t> makeState (const std::string& bundlePath, float mix, bool b
 	crate::state::ContainerState s;
 	s.slotCount = 1;
 	s.normalize ();
-	s.slots[0].uid = crate::integration::gainUidHex ();
+	s.slots[0].uid = gFixtureUid;
 	s.slots[0].bundlePath = bundlePath;
 	s.slots[0].name = "Crate Gain Fixture";
 	s.slots[0].vendor = "Crate Tests";
@@ -170,6 +200,9 @@ auto fixtureModule = VST3::Hosting::Module::create (bundlePath, fixtureModuleErr
 std::printf ("fixture module: %s (%s)\n", fixtureModule ? "loaded" : "FAILED",
              fixtureModuleError.c_str ());
 check (fixtureModule != nullptr, "fixture bundle can be loaded");
+gFixtureUid = fixtureUidHex (fixtureModule ? fixtureModule->getFactory ().get () : nullptr);
+std::printf ("fixture uid: %s\n", gFixtureUid.c_str ());
+check (!gFixtureUid.empty (), "fixture uid read from the bundle");
 if (fixtureModule)
 {
     auto ff = fixtureModule->getFactory ().get ();
@@ -244,7 +277,7 @@ if (fixtureModule)
 		check (round.slots.size () == 1, "one slot saved");
 		if (!round.slots.empty ())
 		{
-			check (round.slots[0].uid == crate::integration::gainUidHex (), "uid saved");
+			check (round.slots[0].uid == gFixtureUid, "uid saved");
 			check (round.slots[0].bundlePath == bundlePath, "bundle path saved");
 		}
 	}
