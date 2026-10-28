@@ -155,13 +155,27 @@ if (CRATE_BUILD_PLUGIN)
 				"The VST3 SDK at ${CRATE_VST3_SDK_DIR} did not provide smtg_add_vst3plugin()")
 		endif ()
 
-		smtg_add_vst3plugin (Crate
+		# The hosting library leaves these two to the host application: the platform module
+# implementation that Module::create comes from, and the memory stream the state code
+# uses. The SDK validator compiles the same files for the same reason.
+set (_crate_hosting_extra
+    ${CRATE_VST3_SDK_DIR}/public.sdk/source/common/memorystream.cpp)
+if (WIN32)
+    list (APPEND _crate_hosting_extra ${CRATE_VST3_SDK_DIR}/public.sdk/source/vst/hosting/module_win32.cpp)
+elseif (APPLE)
+    list (APPEND _crate_hosting_extra ${CRATE_VST3_SDK_DIR}/public.sdk/source/vst/hosting/module_mac.mm)
+else ()
+    list (APPEND _crate_hosting_extra ${CRATE_VST3_SDK_DIR}/public.sdk/source/vst/hosting/module_linux.cpp)
+endif ()
+
+smtg_add_vst3plugin (Crate
 			source/vst3/crateentry.cpp
 			source/vst3/cratecontroller.cpp
 			source/vst3/crateprocessor.cpp
 			source/vst3/hostcontext.cpp
 			source/vst3/vst3instance.cpp
 			source/vst3/vst3loader.cpp
+    ${_crate_hosting_extra}
 		)
 		target_include_directories (Crate PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/source)
 		# `sdk` is the SDK's static library target: it carries pluginfactory.cpp,
@@ -194,13 +208,27 @@ if (CRATE_BUILD_PLUGIN)
 		# IComponent/IAudioProcessor calls and the latency-compensated dry path together.
 		option (CRATE_BUILD_INTEGRATION_TESTS "Build the SDK-linked hosting integration check" ON)
 		if (CRATE_BUILD_INTEGRATION_TESTS)
-			smtg_add_vst3plugin (CrateGainFixture tests/integration/gainplugin.cpp)
+			# The hosting library leaves these two to the host application: the platform module
+# implementation that Module::create comes from, and the memory stream the state code
+# uses. The SDK validator compiles the same files for the same reason.
+set (_crate_hosting_extra
+    ${CRATE_VST3_SDK_DIR}/public.sdk/source/common/memorystream.cpp)
+if (WIN32)
+    list (APPEND _crate_hosting_extra ${CRATE_VST3_SDK_DIR}/public.sdk/source/vst/hosting/module_win32.cpp)
+elseif (APPLE)
+    list (APPEND _crate_hosting_extra ${CRATE_VST3_SDK_DIR}/public.sdk/source/vst/hosting/module_mac.mm)
+else ()
+    list (APPEND _crate_hosting_extra ${CRATE_VST3_SDK_DIR}/public.sdk/source/vst/hosting/module_linux.cpp)
+endif ()
+
+smtg_add_vst3plugin (CrateGainFixture tests/integration/gainplugin.cpp)
 			target_include_directories (CrateGainFixture PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration)
 			if (TARGET sdk)
 				target_link_libraries (CrateGainFixture PRIVATE sdk)
 			endif ()
 
 			add_executable (crate_hosting_check tests/integration/hosting_check.cpp)
+target_sources (crate_hosting_check PRIVATE ${_crate_hosting_extra})
 			target_include_directories (crate_hosting_check PRIVATE
 				${CMAKE_CURRENT_SOURCE_DIR}/tests/integration
 				${CMAKE_CURRENT_SOURCE_DIR}/source)
