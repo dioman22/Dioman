@@ -16,6 +16,7 @@
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
 #include "pluginterfaces/base/ipluginbase.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
+#include "pluginterfaces/vst/ivsteditcontroller.h"
 #include "public.sdk/source/common/memorystream.h"
 #include "public.sdk/source/vst/hosting/module.h"
 
@@ -245,6 +246,52 @@ if (fixtureModule)
 	if (!factory)
 		return 1;
 	HostContext context;
+
+	// 0. The container's own class metadata. Crate is a split plug-in, so the component
+	// has to name its controller class; without that a host and the SDK validator treat
+	// it as having no controller at all (no parameters, no editor) even though the class
+	// is in the factory. Cheap to assert, and it is exactly the defect that shipped in
+	// the first bundle.
+	{
+		IPtr<IComponent> component;
+		for (int32 i = 0; i < factory->countClasses (); ++i)
+		{
+			PClassInfo info {};
+			if (factory->getClassInfo (i, &info) != kResultOk)
+				continue;
+			if (std::strcmp (info.category, kVstAudioEffectClass) != 0)
+				continue;
+			IComponent* raw = nullptr;
+			if (factory->createInstance (info.cid, IComponent::iid,
+			                             reinterpret_cast<void**> (&raw)) == kResultOk &&
+			    raw)
+				component = owned (raw);
+			break;
+		}
+		check (component != nullptr, "the container factory creates its audio component");
+
+		TUID controllerCid {};
+		const tresult hasController =
+		    component ? component->getControllerClassId (controllerCid) : kResultFalse;
+		check (hasController == kResultTrue, "the container component names its controller class");
+
+		IEditController* rawController = nullptr;
+		if (hasController == kResultTrue)
+			factory->createInstance (controllerCid, IEditController::iid,
+			                         reinterpret_cast<void**> (&rawController));
+		IPtr<IEditController> controller = owned (rawController);
+		check (controller != nullptr, "the controller class can be created from the factory");
+		if (controller)
+		{
+			FUnknownPtr<IPluginBase> base (controller);
+			check (base && base->initialize (&context) == kResultOk,
+			       "the controller initializes");
+			check (controller->getParameterCount () > 0,
+			       "the controller exposes the slot parameters");
+			if (base)
+				base->terminate ();
+		}
+	}
 
 	// 1-3. A real bundle, fully wet, then half wet, plus the state round trip.
 	{

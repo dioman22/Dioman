@@ -60,6 +60,13 @@ Install the bundle where the DAW scans:
 * macOS: `~/Library/Audio/Plug-Ins/VST3/Crate.vst3`
 * Linux: `~/.vst3/Crate.vst3`
 
+The bundle's platform entry points come from the SDK itself: `CMakeLists.txt` calls
+`smtg_target_add_library_main(Crate)`, which compiles `dllmain.cpp` on Windows
+(`DllMain`, `InitDll`, `ExitDll`) and `linuxmain.cpp` / `macmain.cpp` on the other
+platforms (`ModuleEntry`). Do not drop that call: a bundle that only exports
+`GetPluginFactory` still loads on Windows (where `InitDll` is optional) but not on
+Linux, where `ModuleEntry` is mandatory.
+
 Then **rescan plugins in the DAW**. A container that "does not appear" is almost always
 a wrong folder or a host that has not rescanned.
 
@@ -129,7 +136,17 @@ state format and asserts that
 * saving and re-reading the state keeps the slot's UID and bundle path.
 
 That check is what catches SDK-API-level mistakes (wrong interface, wrong IID, a plugin
-class that cannot be found) that the SDK-free tests cannot see.
+class that cannot be found) that the SDK-free tests cannot see. It also loads
+`Crate.vst3` itself and asserts that the factory creates the audio component, that the
+component names its controller class, and that the controller initializes and exposes
+the slot parameters. That is the contract a host uses to find the editor; a component
+without it is treated as having no controller at all (`Component does not provide a
+required controller class ID` in the SDK validator).
+
+Run the SDK validator before shipping — hosts blacklist failing plugins permanently:
+`validator Crate.vst3` from the SDK's `public.sdk/samples/vst-hosting/validator`. The
+bundle above passes all 47 validator tests (the "64bit Audio Processing not supported"
+lines are informational: Crate intentionally accepts `kSample32` only).
 
 ## Next milestone: the grid
 
@@ -138,6 +155,3 @@ slots, `CrateProcessor::loadSlot()` swaps a plugin safely on the message thread.
 missing is the view: a searchable grid of cards in `createView()`, with lazy per-card
 `enrich()` so opening the editor never walks the filesystem, and a click that calls
 `loadSlot()`. That is the next commit, not a rewrite.
-
-Run the SDK validator before shipping — hosts blacklist failing plugins permanently:
-`validator Crate.vst3` from the SDK's `public.sdk/samples/vst-hosting/validator`.

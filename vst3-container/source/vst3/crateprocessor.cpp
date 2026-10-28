@@ -1,5 +1,7 @@
 #include "crateprocessor.h"
 
+#include "pluginids.h"
+
 #include "../app/cratepaths.h"
 #include "../util/fs.h"
 #include "../util/stringutil.h"
@@ -54,6 +56,12 @@ CrateProcessor::CrateProcessor ()
 
 	plugFrame_ = owned (new HostedPlugFrame ());
 	componentHandler_ = owned (new HostedComponentHandler ());
+
+	// Crate is split into component and controller, so the component has to name the
+	// controller class. Without it a host — and the SDK validator — concludes the plugin
+	// has no controller at all: no parameters, no editor, and PlugProvider then leaves
+	// the controller null while later tests still use it.
+	setControllerClass (kControllerUID);
 
 	addAudioInput (STR16 ("Input"), SpeakerArr::kStereo);
 	addAudioOutput (STR16 ("Output"), SpeakerArr::kStereo);
