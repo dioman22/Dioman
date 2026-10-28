@@ -125,6 +125,26 @@ jobs:
           $stage = Join-Path $env:RUNNER_TEMP 'crate-dist'
           New-Item -ItemType Directory -Force $stage | Out-Null
           Copy-Item -Recurse $plugin.FullName $stage
+
+          # Ship the host-side check too. It loads Crate.vst3 exactly the way a DAW does,
+          # and prints the reason when that fails - the only way to see the cause on a
+          # machine we cannot inspect.
+          $check = Get-ChildItem build -Recurse -Filter crate_hosting_check.exe | Select-Object -First 1
+          $fixture = Get-ChildItem build -Recurse -Directory -Filter CrateGainFixture.vst3 | Select-Object -First 1
+          if ($check)   { Copy-Item $check.FullName $stage }
+          if ($fixture) { Copy-Item -Recurse $fixture.FullName $stage }
+          $crlf = [string][char]13 + [string][char]10
+          $cmd = @(
+            '@echo off',
+            'cd /d %~dp0',
+            'echo Loading Crate.vst3 the way a host does, through the SDK loader...',
+            'echo.',
+            'crate_hosting_check.exe CrateGainFixture.vst3',
+            'echo.',
+            'if errorlevel 1 (echo RESULT: FAILED - the reason is in the lines above) else (echo RESULT: HOSTING OK)',
+            'pause'
+          ) -join $crlf
+          $cmd | Set-Content -Encoding ascii (Join-Path $stage 'run-check.cmd')
           $lines = @(
             'Crate - VST3 plugin browser and container',
             'built from branch cline/mbpp33tp',
