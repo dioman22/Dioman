@@ -231,7 +231,7 @@ else ()
     list (APPEND _crate_hosting_extra ${CRATE_VST3_SDK_DIR}/public.sdk/source/vst/hosting/module_linux.cpp)
 endif ()
 
-smtg_add_vst3plugin (CrateGainFixture tests/integration/gainplugin.cpp)
+smtg_add_vst3plugin (CrateGainFixture tests/integration/gainplugin.cpp ${_crate_plugin_main})
 			target_include_directories (CrateGainFixture PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration)
 			if (TARGET sdk)
 				target_link_libraries (CrateGainFixture PRIVATE sdk)
