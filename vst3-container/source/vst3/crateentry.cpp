@@ -22,7 +22,23 @@ BEGIN_FACTORY (crate::vst3::kVendor, crate::vst3::kVendorUrl, crate::vst3::kVend
 	            crate::vst3::CrateController::createInstance)
 END_FACTORY
 
-// The platform entry points (ModuleEntry/ModuleExit on Linux, InitDll/ExitDll on Windows)
-// and InitModule/DeinitModule come from the SDK's own main sources, which the SDK's CMake
-// adds to every plugin target. Do not define them here: a second definition is a link
-// error, and a missing one is a plugin no host can load.
+#if defined(_WIN32)
+// A Windows host calls these two right after loading a VST3 module. InitModule and
+// DeinitModule live in moduleinit.cpp inside sdk.lib, and referencing them here is also
+// what pulls that object into the link.
+extern bool InitModule ();
+extern bool DeinitModule ();
+
+extern "C" __declspec (dllexport) bool InitDll ()
+{
+	return InitModule ();
+}
+
+extern "C" __declspec (dllexport) bool ExitDll ()
+{
+	return DeinitModule ();
+}
+#endif
+'s own main sources, which the SDK's CMake
+
+
