@@ -188,6 +188,10 @@ smtg_add_vst3plugin (Crate
 			${_crate_plugin_main}
     ${_crate_hosting_extra}
 		)
+		# The SDK cmake does not add its platform main (DllMain, InitDll/ExitDll, and the
+		# moduleHandle that moduleinit.obj needs) to a third-party plugin target, so a
+		# bundle built without this exports GetPluginFactory alone and a DAW refuses it.
+		target_sources (Crate PRIVATE ${_crate_plugin_main})
 		target_include_directories (Crate PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/source)
 		# `sdk` is the SDK's static library target: it carries pluginfactory.cpp,
 		# moduleinit.cpp (InitModule/DeinitModule) and stringconvert, and the platform main
@@ -232,7 +236,8 @@ else ()
     list (APPEND _crate_hosting_extra ${CRATE_VST3_SDK_DIR}/public.sdk/source/vst/hosting/module_linux.cpp)
 endif ()
 
-smtg_add_vst3plugin (CrateGainFixture tests/integration/gainplugin.cpp ${_crate_plugin_main})
+smtg_add_vst3plugin (CrateGainFixture tests/integration/gainplugin.cpp)
+			target_sources (CrateGainFixture PRIVATE ${_crate_plugin_main})
 			target_include_directories (CrateGainFixture PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration)
 			if (TARGET sdk)
 				target_link_libraries (CrateGainFixture PRIVATE sdk)
