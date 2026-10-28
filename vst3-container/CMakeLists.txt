@@ -38,6 +38,10 @@ set(CRATE_VST3_SDK_TAG "v3.7.11_build_10" CACHE STRING
 set(SMTG_ENABLE_VSTGUI_SUPPORT OFF CACHE BOOL "VSTGUI is not used by Crate")
 set(SMTG_ENABLE_VST3_PLUGIN_EXAMPLES OFF CACHE BOOL "Skip the SDK example plug-ins")
 
+# A .vst3 that someone installs must not depend on a Visual C++ Redistributable of the
+# exact toolchain version. /MT only affects MSVC; other platforms ignore the option.
+set(SMTG_USE_STATIC_CRT ON CACHE BOOL "Link the C runtime statically (/MT)")
+
 # --------------------------------------------------------------------------------------
 # Core library: registry readers, state codec, journal, engine. No SDK, no GUI, no audio
 # device. If this does not compile, nothing else matters.
