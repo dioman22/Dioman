@@ -39,6 +39,6 @@ extern "C" __declspec (dllexport) bool ExitDll ()
 	return DeinitModule ();
 }
 #endif
-'s own main sources, which the SDK's CMake
+
 
 
