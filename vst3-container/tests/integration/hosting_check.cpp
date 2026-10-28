@@ -19,6 +19,7 @@
 #include "public.sdk/source/vst/hosting/module.h"
 
 #include "../../source/state/containerstate.h"
+#include "../../source/util/fs.h"
 
 #include <cmath>
 #include <cstdio>
@@ -161,6 +162,13 @@ int main (int argc, char** argv)
 	}
 	const std::string bundlePath = argv[1];
 	std::printf ("fixture: %s\n", bundlePath.c_str ());
+std::printf ("fixture exists: %d\n", crate::fs::directoryExists (bundlePath) ? 1 : 0);
+check (crate::fs::directoryExists (bundlePath), "fixture bundle path resolves");
+std::string fixtureModuleError;
+auto fixtureModule = VST3::Hosting::Module::create (bundlePath, fixtureModuleError);
+std::printf ("fixture module: %s (%s)\n", fixtureModule ? "loaded" : "FAILED",
+             fixtureModuleError.c_str ());
+check (fixtureModule != nullptr, "fixture bundle can be loaded");
 
 	std::string containerPath = containerBundlePathFrom (bundlePath);
     std::printf ("container: %s\n", containerPath.c_str ());
