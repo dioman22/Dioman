@@ -72,7 +72,7 @@ std::vector<uint8_t> makeState (const std::string& bundlePath, float mix, bool b
 	crate::state::ContainerState s;
 	s.slotCount = 1;
 	s.normalize ();
-	s.slots[0].uid = crate::integration::kGainUid;
+	s.slots[0].uid = crate::integration::gainUidHex ();
 	s.slots[0].bundlePath = bundlePath;
 	s.slots[0].name = "Crate Gain Fixture";
 	s.slots[0].vendor = "Crate Tests";
@@ -244,7 +244,7 @@ if (fixtureModule)
 		check (round.slots.size () == 1, "one slot saved");
 		if (!round.slots.empty ())
 		{
-			check (round.slots[0].uid == crate::integration::kGainUid, "uid saved");
+			check (round.slots[0].uid == crate::integration::gainUidHex (), "uid saved");
 			check (round.slots[0].bundlePath == bundlePath, "bundle path saved");
 		}
 	}
