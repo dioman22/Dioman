@@ -30,6 +30,14 @@ set(CRATE_VST3_SDK_DIR "" CACHE PATH "Path to the VST3 SDK root (the folder hold
 set(CRATE_VST3_SDK_TAG "v3.7.11_build_10" CACHE STRING
 	"Steinberg VST3 SDK git tag fetched when CRATE_FETCH_VST3_SDK is ON")
 
+# Crate is raw-SDK: it never touches VSTGUI. The SDK defaults both of these to ON, which
+# needs the vstgui4 submodule (the fetch below deliberately does not bring it in) and
+# builds the SDK's world of example plug-ins. Flip them once here, so that every way of
+# pointing this build at an SDK — a local checkout via CRATE_VST3_SDK_DIR or the fetch —
+# configures the same thing. An explicit -D on the command line still wins.
+set(SMTG_ENABLE_VSTGUI_SUPPORT OFF CACHE BOOL "VSTGUI is not used by Crate")
+set(SMTG_ENABLE_VST3_PLUGIN_EXAMPLES OFF CACHE BOOL "Skip the SDK example plug-ins")
+
 # --------------------------------------------------------------------------------------
 # Core library: registry readers, state codec, journal, engine. No SDK, no GUI, no audio
 # device. If this does not compile, nothing else matters.
@@ -121,15 +129,6 @@ endif()
 if (CRATE_BUILD_PLUGIN)
 	if (CRATE_FETCH_VST3_SDK AND NOT CRATE_VST3_SDK_DIR)
 		include (FetchContent)
-		# Crate is raw-SDK: it never touches VSTGUI, and the vstgui4 submodule is not in the
-		# fetch list above, so VSTGUI support has to be off or the SDK's own CMake fails on
-		# the missing directory. The SDK's example plug-ins are dead weight here too.
-		if (NOT DEFINED SMTG_ENABLE_VSTGUI_SUPPORT)
-			set (SMTG_ENABLE_VSTGUI_SUPPORT OFF CACHE BOOL "VSTGUI is not used by Crate")
-		endif ()
-		if (NOT DEFINED SMTG_ENABLE_VST3_PLUGIN_EXAMPLES)
-			set (SMTG_ENABLE_VST3_PLUGIN_EXAMPLES OFF CACHE BOOL "Skip the SDK example plug-ins")
-		endif ()
 		FetchContent_Declare (vst3sdk
 			GIT_REPOSITORY https://github.com/steinbergmedia/vst3sdk.git
 			GIT_TAG ${CRATE_VST3_SDK_TAG}
