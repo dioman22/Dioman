@@ -15,7 +15,7 @@ namespace {
 fsys::path toPath (const std::string& p)
 {
 #if defined(_WIN32)
-	return fsys::path (std::u8string (p.begin (), p.end ()));
+	return fsys::u8path (p);
 #else
 	return fsys::path (p);
 #endif
