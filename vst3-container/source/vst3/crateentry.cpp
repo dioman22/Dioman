@@ -22,23 +22,7 @@ BEGIN_FACTORY (crate::vst3::kVendor, crate::vst3::kVendorUrl, crate::vst3::kVend
 	            crate::vst3::CrateController::createInstance)
 END_FACTORY
 
-#if defined(_WIN32)
-// A Windows host calls these two right after loading a VST3 module. InitModule and
-// DeinitModule live in moduleinit.cpp inside sdk.lib, and referencing them here is also
-// what pulls that object into the link.
-extern bool InitModule ();
-extern bool DeinitModule ();
 
-extern "C" __declspec (dllexport) bool InitDll ()
-{
-	return InitModule ();
-}
-
-extern "C" __declspec (dllexport) bool ExitDll ()
-{
-	return DeinitModule ();
-}
-#endif
 
 
 
