@@ -37,7 +37,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build and run the SDK-free suite
-        run: bash vst3-container/scripts/build-tests.sh
+        run: |
+          bash vst3-container/scripts/build-tests.sh > /tmp/core.log 2>&1 || code=$?
+          code=${code:-0}
+          cat /tmp/core.log
+          if [ "$code" -ne 0 ]; then
+            tail -40 /tmp/core.log | sed 's/^/::error::/'
+            exit "$code"
+          fi
 
   # ---------------------------------------------------------------------------------
   # The plug-in itself. Crate.vst3 is the deliverable; the integration check and the
@@ -50,18 +57,19 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure (fetches the VST3 SDK and its submodules)
-        run: >-
-          cmake -S vst3-container -B build -A x64
-          -DCRATE_FETCH_VST3_SDK=ON
-          -DCRATE_VST3_SDK_TAG=${{ env.VST3_SDK_TAG }}
+        shell: pwsh
+        run: |
+          ./.github/scripts/run-step.ps1 -- cmake -S vst3-container -B build -A x64 '-DCRATE_FETCH_VST3_SDK=ON' '-DCRATE_VST3_SDK_TAG=${{ env.VST3_SDK_TAG }}'
 
       - name: Build the plug-in, the fixture plug-in and the tests
-        run: >-
-          cmake --build build --config Release
-          --target Crate crate_core CrateGainFixture crate_hosting_check crate_tests
+        shell: pwsh
+        run: |
+          ./.github/scripts/run-step.ps1 -- cmake --build build --config Release --target Crate crate_core CrateGainFixture crate_hosting_check crate_tests
 
       - name: SDK-free unit suite
-        run: ctest --test-dir build -C Release -R crate_tests --output-on-failure
+        shell: pwsh
+        run: |
+          ./.github/scripts/run-step.ps1 -- ctest --test-dir build -C Release -R crate_tests --output-on-failure
 
       - name: Hosting integration check (loads a real bundle through the container)
         shell: pwsh
@@ -80,7 +88,9 @@ jobs:
 
       - name: Build the SDK validator
         continue-on-error: true
-        run: cmake --build build --config Release --target validator
+        shell: pwsh
+        run: |
+          ./.github/scripts/run-step.ps1 -- cmake --build build --config Release --target validator
 
       - name: Validate Crate.vst3 (informational)
         continue-on-error: true
