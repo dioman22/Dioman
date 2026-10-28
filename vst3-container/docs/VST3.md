@@ -73,6 +73,14 @@ a wrong folder or a host that has not rescanned.
 
 ## What works today
 
+* **The editor: a searchable grid of the host's own plugin registry.** Cards show name,
+  vendor, category and a status badge; a vendor accent makes the wall readable before
+  snapshots exist. Clicking a card (or Enter) loads it into the selected slot; the eight
+  slot chips at the top choose the slot. Arrow keys, Page Up/Down, the wheel and the
+  scrollbar navigate. The header always names the registry the list came from, and the
+  footer reports the load result or the reason it failed — never an unexplained empty grid.
+* **No scanning on open.** The list is the host registry, read once; `moduleinfo.json` is
+  read per card, a few cards per idle tick, and a click resolves its own card if needed.
 * Loads the plugins named in the session state, in slot order, in series.
 * Bit-transparent pass-through when no slot is loaded (`Chain` copies, never masks).
 * Latency compensation: every slot's dry path is delayed by exactly the hosted plugin's
@@ -89,17 +97,20 @@ a wrong folder or a host that has not rescanned.
 
 ## What is not built yet (stated, not hidden)
 
-1. **The grid editor.** `createView()` returns `nullptr`, so hosts show their generic
-   parameter list. The parameter map, formatting and per-slot mix/bypass are in place.
-2. **MIDI routing.** Only the main audio bus pair is hosted; instruments load but do not
+1. **Snapshot images on the cards.** `moduleinfo.json` snapshots are parsed and cached by
+   the registry layer, but the editor draws a vendor-coloured accent instead of the image.
+   Loading visible bitmaps is the next UI commit.
+2. **A Linux/macOS editor build.** The editor is VSTGUI and defaults on for Windows (the
+   shipped bundle). On Linux VSTGUI needs the X11/cairo/pango development packages; the
+   CMake option `-DCRATE_BUILD_EDITOR=ON` is there, but it is not wired into CI.
+3. **MIDI routing.** Only the main audio bus pair is hosted; instruments load but do not
    receive events. Audio effects are unaffected.
-3. **Forwarding `restartComponent`.** A hosted plugin that changes latency at runtime is
-   noticed (`HostedComponentHandler::latencyChanged`), but the container does not yet
-   push `kLatencyChanged` to its own controller, because the processor↔controller channel
-   (IConnectionPoint) is not wired.
-4. **Out-of-process loading.** Crashing plugins take the container down with them; the
+4. **Forwarding `restartComponent` from hosted plugins.** The container tells its own host
+   that latency changed after a load, but a hosted plugin that changes latency at runtime
+   is only noticed (`HostedComponentHandler::latencyChanged`), not yet pushed upstream.
+5. **Out-of-process loading.** Crashing plugins take the container down with them; the
    journal and safe mode bound the damage, they do not prevent it.
-5. **Parameter mirroring.** Hosted parameters do not appear in the DAW's automation list.
+6. **Parameter mirroring.** Hosted parameters do not appear in the DAW's automation list.
 
 ## The rules the audio path follows
 
@@ -148,10 +159,10 @@ Run the SDK validator before shipping — hosts blacklist failing plugins perman
 bundle above passes all 47 validator tests (the "64bit Audio Processing not supported"
 lines are informational: Crate intentionally accepts `kSample32` only).
 
-## Next milestone: the grid
+## Next milestone: inside the card
 
-The pieces already exist — `RegistryService` returns the cards, `params` addresses the
-slots, `CrateProcessor::loadSlot()` swaps a plugin safely on the message thread. What is
-missing is the view: a searchable grid of cards in `createView()`, with lazy per-card
-`enrich()` so opening the editor never walks the filesystem, and a click that calls
-`loadSlot()`. That is the next commit, not a rewrite.
+The grid, the search, the slot chips and the click-to-load path are in place. The next
+work is inside a loaded card: embed the hosted plugin's own editor (`IEditController::
+createView` + our `IPlugFrame`) in a panel of the container, and draw `moduleinfo.json`
+snapshot images instead of the vendor accent. After that: MIDI routing to hosted
+instruments, and mirroring hosted parameters into the DAW's automation list.
