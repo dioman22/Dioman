@@ -67,15 +67,15 @@ jobs:
 
       - name: Configure (against the checked-out SDK)
         shell: pwsh
-        timeout-minutes: 12
+        timeout-minutes: 8
         run: |
-          ./.github/scripts/run-step.ps1 -Annotate -TimeoutSeconds 300 -- cmake -S vst3-container -B build -A x64 '-DCRATE_VST3_SDK_DIR=${{ runner.temp }}/vst3sdk'
+          ./.github/scripts/run-step.ps1 -- cmake -S vst3-container -B build -A x64 '-DCRATE_VST3_SDK_DIR=${{ runner.temp }}/vst3sdk'
 
       - name: Build the plug-in, the fixture plug-in and the tests
         shell: pwsh
         timeout-minutes: 32
         run: |
-          ./.github/scripts/run-step.ps1 -Annotate -TimeoutSeconds 1800 -- cmake --build build --config Release --target Crate crate_core CrateGainFixture crate_hosting_check crate_tests
+          ./.github/scripts/run-step.ps1 -- cmake --build build --config Release --target Crate crate_core CrateGainFixture crate_hosting_check crate_tests
 
       - name: SDK-free unit suite
         shell: pwsh
@@ -170,3 +170,18 @@ jobs:
             Known limitation at this stage: `createView()` returns `nullptr`, so the host
             shows its generic parameter list instead of the card grid. The hosting engine,
             registry readers, state codec and crash journal are in place and unit-tested.
+
+      - name: Publish the step logs to a scratch branch
+        if: always()
+        shell: pwsh
+        run: |
+          $logs = @(Get-ChildItem $env:RUNNER_TEMP -Filter 'step-*.log' -ErrorAction SilentlyContinue)
+          if ($logs.Count -eq 0) { Write-Host 'no step logs to publish'; exit 0 }
+          New-Item -ItemType Directory -Force logs | Out-Null
+          foreach ($f in $logs) { Copy-Item $f.FullName (Join-Path 'logs' $f.Name) }
+          git config user.name 'github-actions'
+          git config user.email 'github-actions@users.noreply.github.com'
+          git checkout -B ci-logs
+          git add -f logs
+          git commit -m "ci logs for ${{ github.sha }}"
+          git push --force origin ci-logs
