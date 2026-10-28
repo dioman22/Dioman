@@ -18,6 +18,25 @@ Entry* findByName (std::vector<Entry>& entries, const std::string& name)
 	}
 	return nullptr;
 }
+// Windows has no setenv/unsetenv. _putenv_s with an empty value removes the
+// variable, which is the only thing these tests need.
+void setRegistryVar (const char* value)
+{
+#if defined(_WIN32)
+    _putenv_s ("CRATE_REGISTRY", value);
+#else
+    setenv ("CRATE_REGISTRY", value, 1);
+#endif
+}
+
+void clearRegistryVar ()
+{
+#if defined(_WIN32)
+    _putenv_s ("CRATE_REGISTRY", "");
+#else
+    unsetenv ("CRATE_REGISTRY");
+#endif
+}
 } // namespace
 
 CRATE_TEST (registry_service_reads_reader_and_enriches_lazily)
@@ -46,7 +65,7 @@ CRATE_TEST (registry_service_reads_reader_and_enriches_lazily)
 	                      "FabFilter Pro-Q 4.vst3=BD58B550F9E5634E9D2EFF39EA0927B1,1,Pro-Q 4 (FabFilter)\n"
 	                      "Serum.vst3=3C4D5E6F708192A3B4C5D6E7F8091A2B,2,Serum (Xfer Records)!!!VSTi\n"
 	                      "Nowhere.vst3=00112233445566778899AABBCCDDEEFF,3,Nowhere (Nobody)\n");
-	::setenv ("CRATE_REGISTRY", ini.c_str (), 1);
+	setRegistryVar (ini.c_str ());
 
 	auto dataDir = dir.mkdir ("data");
 	RegistryService service ("REAPER", "7.99", dataDir, {plugins});
@@ -93,7 +112,7 @@ CRATE_TEST (registry_service_reads_reader_and_enriches_lazily)
 	// Calling enrich again must reuse the moduleinfo cache (mtime based), not reread.
 	service.enrich (*proq);
 	CHECK_EQ (proq->status, Status::Ready);
-	::unsetenv ("CRATE_REGISTRY");
+	clearRegistryVar ();
 }
 
 CRATE_TEST (registry_service_explains_unknown_host_and_fallback)
@@ -116,7 +135,7 @@ CRATE_TEST (registry_service_explains_unknown_host_and_fallback)
 		]
 	})";
 	dir.write ("data/fallback-index.json", cached);
-	::setenv ("CRATE_REGISTRY", "/nonexistent/reaper-vstplugins64.ini", 1);
+	setRegistryVar ("/nonexistent/reaper-vstplugins64.ini");
 	RegistryService reaper ("REAPER", "7.99", dataDir);
 	auto fallback = reaper.load (true);
 	CHECK (fallback.state == ReaderState::NotFound);
@@ -134,7 +153,7 @@ CRATE_TEST (registry_service_explains_unknown_host_and_fallback)
 	auto noFallback = reaper2.load (false);
 	CHECK (noFallback.state == ReaderState::NotFound);
 	CHECK (noFallback.entries.empty ());
-	::unsetenv ("CRATE_REGISTRY");
+	clearRegistryVar ();
 }
 
 CRATE_TEST (registry_service_marks_blacklist_without_hiding)
