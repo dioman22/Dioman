@@ -18,10 +18,10 @@
 param(
     # Kill the command after this many seconds. GitHub's own step timeout does not reliably
     # end a wedged child process tree, and a step that never ends publishes no evidence.
-    [int] $TimeoutSeconds = 0,
+    [Parameter(Position = 0, ValueFromRemainingArguments = $true)]
+    [string[]] $Command,
 
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [string[]] $Command
+    [int] $TimeoutSeconds = 0
 )
 
 if ($Command -and $Command[0] -eq '--') {
