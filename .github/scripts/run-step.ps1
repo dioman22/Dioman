@@ -16,6 +16,10 @@
 # polling the file looked like a way to add a timeout, and it made the SDK fetch step fail
 # in one second with no output captured.
 param(
+    # Kill the command after this many seconds. GitHub's own step timeout does not reliably
+    # end a wedged child process tree, and a step that never ends publishes no evidence.
+    [int] $TimeoutSeconds = 0,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]] $Command
 )
@@ -33,13 +37,58 @@ $log = Join-Path $env:RUNNER_TEMP ('step-' + [guid]::NewGuid().ToString('N') + '
 Write-Host "run-step: $($Command -join ' ')"
 Write-Host "run-step: log $log"
 
-if ($Command.Count -eq 1) {
-    & $Command[0] 2>&1 | Tee-Object -FilePath $log
+if ($TimeoutSeconds -le 0) {
+    if ($Command.Count -eq 1) {
+        & $Command[0] 2>&1 | Tee-Object -FilePath $log
+    } else {
+        & $Command[0] $Command[1..($Command.Count - 1)] 2>&1 | Tee-Object -FilePath $log
+    }
+    $code = $LASTEXITCODE
 } else {
-    & $Command[0] $Command[1..($Command.Count - 1)] 2>&1 | Tee-Object -FilePath $log
+    # Start-Process needs a resolved path: it failed here before by being handed the bare
+    # name 'git', which took the SDK fetch step down in one second.
+    $exe = $Command[0]
+    $resolved = Get-Command $Command[0] -ErrorAction SilentlyContinue
+    if ($resolved) { $exe = $resolved.Source }
+
+    $stdout = "$log.out"
+    $stderr = "$log.err"
+    $arguments = if ($Command.Count -gt 1) { $Command[1..($Command.Count - 1)] } else { @() }
+
+    $proc = Start-Process -FilePath $exe -ArgumentList $arguments -NoNewWindow -PassThru `
+            -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    if ($null -eq $proc) {
+        Write-Host '::error::run-step.ps1 could not start the command'
+        exit 2
+    }
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while (-not $proc.HasExited) {
+        Start-Sleep -Seconds 3
+        if (-not $proc.HasExited -and (Get-Date) -gt $deadline) {
+            Write-Host "run-step: still running after $TimeoutSeconds s, killing it"
+            & taskkill /T /F /PID $proc.Id 2>&1 | Out-Null
+            Start-Sleep -Seconds 2
+            break
+        }
+    }
+
+    foreach ($file in @($stdout, $stderr)) {
+        foreach ($line in @(Get-Content -Path $file -ErrorAction SilentlyContinue)) {
+            Add-Content -Path $log -Value $line
+        }
+    }
+
+    $stalled = -not $proc.HasExited
+    if ($stalled) {
+        Write-Host 'run-step: last lines written before the kill'
+        Get-Content -Path $log -Tail 45 | ForEach-Object { "::error::$_" }
+        exit 124
+    }
+
+    $code = $proc.ExitCode
 }
 
-$code = $LASTEXITCODE
 if ($null -eq $code) { $code = 0 }
 
 if ($code -ne 0) {
