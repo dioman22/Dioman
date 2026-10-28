@@ -13,6 +13,7 @@ namespace crate::vst3 {
 
 using namespace Steinberg;
 using namespace Steinberg::Vst;
+using namespace VST3;
 
 namespace {
 
@@ -150,7 +151,7 @@ void CrateController::addParameters ()
 			const std::string text = host::params::title (id);
 			StringConvert::convert (text, title);
 			const int32 stepCount =
-			    kind == host::params::SlotParam::Bypass ? 1 : kStepCountContinuous;
+			    kind == host::params::SlotParam::Bypass ? 1 : 0;
 			parameters.addParameter (new CrateParameter (title, id, host::params::defaultPlain (id),
 			                                             stepCount,
 			                                             ParameterInfo::kCanAutomate));
