@@ -165,6 +165,18 @@ if (CRATE_BUILD_PLUGIN)
 				"The VST3 SDK at ${CRATE_VST3_SDK_DIR} did not provide smtg_add_vst3plugin()")
 		endif ()
 
+		# The SDK's platform main (DllMain/InitDll/ExitDll on Windows, ModuleEntry on
+		# Linux/macOS) is not part of smtg_add_vst3plugin: the SDK leaves that to the
+		# plug-in target through smtg_target_add_library_main(). That helper needs
+		# public_sdk_SOURCE_DIR, which smtg_enable_vst3_sdk() derives from the sdk target.
+		if (COMMAND smtg_enable_vst3_sdk)
+			smtg_enable_vst3_sdk ()
+		endif ()
+		if (NOT COMMAND smtg_target_add_library_main)
+			message (FATAL_ERROR
+				"The VST3 SDK at ${CRATE_VST3_SDK_DIR} did not provide smtg_target_add_library_main()")
+		endif ()
+
 		# The hosting library leaves these two to the host application: the platform module
 # implementation that Module::create comes from, and the memory stream the state code
 # uses. The SDK validator compiles the same files for the same reason.
@@ -185,17 +197,16 @@ smtg_add_vst3plugin (Crate
 			source/vst3/hostcontext.cpp
 			source/vst3/vst3instance.cpp
 			source/vst3/vst3loader.cpp
-			${_crate_plugin_main}
     ${_crate_hosting_extra}
 		)
-		# The SDK cmake does not add its platform main (DllMain, InitDll/ExitDll, and the
-		# moduleHandle that moduleinit.obj needs) to a third-party plugin target, so a
-		# bundle built without this exports GetPluginFactory alone and a DAW refuses it.
-		target_sources (Crate PRIVATE ${_crate_plugin_main})
+		# A bundle that exports GetPluginFactory and nothing else loads on Windows (InitDll
+		# is optional there) but not on Linux, where ModuleEntry is mandatory, and older
+		# hosts want the platform entry points everywhere. Let the SDK add its own main.
+		smtg_target_add_library_main (Crate)
 		target_include_directories (Crate PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/source)
 		# `sdk` is the SDK's static library target: it carries pluginfactory.cpp,
-		# moduleinit.cpp (InitModule/DeinitModule) and stringconvert, and the platform main
-		# (ModuleEntry / InitDll) is added to our target by smtg_add_vst3plugin.
+		# moduleinit.cpp (InitModule/DeinitModule) and stringconvert; the platform main
+		# (ModuleEntry / InitDll) is added above by smtg_target_add_library_main.
 		if (TARGET sdk)
 			target_link_libraries (Crate PRIVATE sdk crate_core)
         # HostApplication and VST3::Hosting::Module live in the hosting library.
@@ -237,7 +248,7 @@ else ()
 endif ()
 
 smtg_add_vst3plugin (CrateGainFixture tests/integration/gainplugin.cpp)
-			target_sources (CrateGainFixture PRIVATE ${_crate_plugin_main})
+			smtg_target_add_library_main (CrateGainFixture)
 			target_include_directories (CrateGainFixture PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tests/integration)
 			if (TARGET sdk)
 				target_link_libraries (CrateGainFixture PRIVATE sdk)
