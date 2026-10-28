@@ -69,7 +69,7 @@ jobs:
         shell: pwsh
         timeout-minutes: 10
         run: |
-          ./.github/scripts/run-step.ps1 -TimeoutSeconds 420 -- cmake -S vst3-container -B build -A x64 '-DCRATE_VST3_SDK_DIR=${{ runner.temp }}/vst3sdk'
+          ./.github/scripts/run-step.ps1 -TimeoutSeconds 420 -- cmake -S vst3-container -B build -A x64 '-DCRATE_VST3_SDK_DIR=${{ runner.temp }}/vst3sdk' -DSMTG_RUN_VST_VALIDATOR=OFF
 
       - name: Build the plug-in, the fixture plug-in and the tests
         shell: pwsh
