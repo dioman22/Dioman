@@ -185,6 +185,7 @@ smtg_add_vst3plugin (Crate
 			source/vst3/hostcontext.cpp
 			source/vst3/vst3instance.cpp
 			source/vst3/vst3loader.cpp
+			${_crate_plugin_main}
     ${_crate_hosting_extra}
 		)
 		target_include_directories (Crate PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/source)
