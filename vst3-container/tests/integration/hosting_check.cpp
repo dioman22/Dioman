@@ -14,7 +14,7 @@
 
 #include "pluginterfaces/base/smartpointer.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
-#include "pluginterfaces/vst/ivstpluginfactory.h"
+#include "pluginterfaces/base/ipluginbase.h"
 #include "pluginterfaces/vst/ivstcomponent.h"
 #include "public.sdk/source/common/memorystream.h"
 #include "public.sdk/source/vst/hosting/module.h"
