@@ -53,13 +53,23 @@ jobs:
   vst3-windows:
     name: Crate.vst3 (windows x64)
     runs-on: windows-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure (fetches the VST3 SDK and its submodules)
+      - name: Fetch the VST3 SDK (${{ env.VST3_SDK_TAG }}, shallow)
         shell: pwsh
         run: |
-          ./.github/scripts/run-step.ps1 -- cmake -S vst3-container -B build -A x64 '-DCRATE_FETCH_VST3_SDK=ON' '-DCRATE_VST3_SDK_TAG=${{ env.VST3_SDK_TAG }}'
+          ./.github/scripts/run-step.ps1 -- git clone --depth 1 --branch ${{ env.VST3_SDK_TAG }} https://github.com/steinbergmedia/vst3sdk.git '${{ runner.temp }}/vst3sdk'
+          foreach ($module in 'base', 'pluginterfaces', 'public.sdk', 'cmake') {
+            ./.github/scripts/run-step.ps1 -- git -C '${{ runner.temp }}/vst3sdk' submodule update --init --depth 1 $module
+          }
+
+      - name: Configure (against the checked-out SDK)
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          ./.github/scripts/run-step.ps1 -- cmake -S vst3-container -B build -A x64 '-DCRATE_VST3_SDK_DIR=${{ runner.temp }}/vst3sdk'
 
       - name: Build the plug-in, the fixture plug-in and the tests
         shell: pwsh

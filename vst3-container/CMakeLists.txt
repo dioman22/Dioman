@@ -133,8 +133,12 @@ if (CRATE_BUILD_PLUGIN)
 		FetchContent_Declare (vst3sdk
 			GIT_REPOSITORY https://github.com/steinbergmedia/vst3sdk.git
 			GIT_TAG ${CRATE_VST3_SDK_TAG}
+			GIT_SHALLOW TRUE
 			GIT_SUBMODULES base pluginterfaces public.sdk cmake
-			GIT_SUBMODULES_RECURSE TRUE
+			# Not recursive: the four submodules above pull nested repositories that Crate
+			# never links, and a nested fetch of one that wants credentials hangs the build
+			# instead of failing it.
+			GIT_SUBMODULES_RECURSE FALSE
 		)
 		FetchContent_MakeAvailable (vst3sdk)
 		set (CRATE_VST3_SDK_DIR ${vst3sdk_SOURCE_DIR})
