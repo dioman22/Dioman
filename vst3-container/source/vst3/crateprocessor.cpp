@@ -9,6 +9,7 @@
 #include "pluginterfaces/vst/ivstparameterchanges.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <limits>
 
@@ -361,6 +362,7 @@ tresult PLUGIN_API CrateProcessor::setState (IBStream* stream)
 			slot.setStatus (registry::Status::Crashed,
 			                "the host crashed while loading this plugin last time; it was "
 			                "left out of this session");
+			std::fprintf (stderr, "crate: safe-mode skip for %s\n", identity.name.c_str ());
 			continue;
 		}
 
@@ -378,6 +380,8 @@ tresult PLUGIN_API CrateProcessor::setState (IBStream* stream)
 		{
 			slot.clear ();
 			slot.setStatus (result.status, result.error);
+			std::fprintf (stderr, "crate: load failed for %s: %s\n",
+			              identity.bundlePath.c_str (), result.error.c_str ());
 			continue;
 		}
 		if (!slotState.componentState.empty ())
