@@ -16,7 +16,8 @@ using namespace Steinberg::Vst;
 
 namespace {
 
-const FUID kGainUid (0x11223344, 0x55667788, 0x99AABBCC, 0xDDEEFF01);
+const FUID kGainUid (crate::integration::kGainUidLong1, crate::integration::kGainUidLong2,
+                     crate::integration::kGainUidLong3, crate::integration::kGainUidLong4);
 
 class GainProcessor : public AudioEffect
 {
