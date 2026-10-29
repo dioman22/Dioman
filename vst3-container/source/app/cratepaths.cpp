@@ -7,6 +7,11 @@ namespace crate::app {
 
 namespace {
 
+std::string rootOf (const std::string& dataDir)
+{
+	return dataDir.empty () ? dataDirectory () : dataDir;
+}
+
 /** Comparison key for a folder path: case folded and lexically normalised, so
  *  "C:\Vst\" and "c:/vst" are the same folder. */
 std::string folderKey (const std::string& folder)
@@ -62,17 +67,17 @@ std::string fallbackCachePath ()
 	return fs::join (dataDirectory (), "fallback-index.json");
 }
 
-std::string pluginFoldersPath ()
+std::string pluginFoldersPath (const std::string& dataDir)
 {
-	return fs::join (dataDirectory (), "folders.txt");
+	return fs::join (rootOf (dataDir), "folders.txt");
 }
 
-std::vector<std::string> userPluginFolders ()
+std::vector<std::string> userPluginFolders (const std::string& dataDir)
 {
-	return readFolderLines (pluginFoldersPath ());
+	return readFolderLines (pluginFoldersPath (dataDir));
 }
 
-bool writeUserPluginFolders (const std::vector<std::string>& folders)
+bool writeUserPluginFolders (const std::vector<std::string>& folders, const std::string& dataDir)
 {
 	std::vector<std::string> lines;
 	lines.push_back ("# Crate plugin folders, one absolute path per line.");
@@ -80,29 +85,29 @@ bool writeUserPluginFolders (const std::vector<std::string>& folders)
 	lines.push_back ("# Add or remove folders here by hand, or from Crate's own folder panel.");
 	for (const auto& folder : folders)
 		lines.push_back (folder);
-	return fs::writeFile (pluginFoldersPath (), join (lines, "\n") + "\n");
+	return fs::writeFile (pluginFoldersPath (dataDir), join (lines, "\n") + "\n");
 }
 
-bool addUserPluginFolder (const std::string& folder)
+bool addUserPluginFolder (const std::string& folder, const std::string& dataDir)
 {
 	auto trimmed = std::string (trimView (folder));
 	if (trimmed.empty ())
 		return false;
 	auto key = folderKey (trimmed);
-	auto current = userPluginFolders ();
+	auto current = userPluginFolders (dataDir);
 	for (const auto& existing : current)
 	{
 		if (folderKey (existing) == key)
 			return false;
 	}
 	current.push_back (trimmed);
-	return writeUserPluginFolders (current);
+	return writeUserPluginFolders (current, dataDir);
 }
 
-bool removeUserPluginFolder (const std::string& folder)
+bool removeUserPluginFolder (const std::string& folder, const std::string& dataDir)
 {
 	auto key = folderKey (folder);
-	auto current = userPluginFolders ();
+	auto current = userPluginFolders (dataDir);
 	std::vector<std::string> kept;
 	for (const auto& existing : current)
 	{
@@ -111,7 +116,7 @@ bool removeUserPluginFolder (const std::string& folder)
 	}
 	if (kept.size () == current.size ())
 		return false;
-	return writeUserPluginFolders (kept);
+	return writeUserPluginFolders (kept, dataDir);
 }
 
 bool ensureDataDirectories ()

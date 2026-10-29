@@ -59,6 +59,18 @@ void applyIndexMetadata (Entry& entry, const Entry& fromIndex)
 	}
 }
 
+/** Unset means "include them": a stock install must work with no configuration at
+ *  all. The override exists for support and for the test suite, whose assertions
+ *  must not depend on whatever plugins happen to be installed on the machine. */
+bool includeStandardFolders ()
+{
+	auto value = fs::environmentVariable ("CRATE_STANDARD_FOLDERS");
+	if (value.empty ())
+		return true;
+	return !(iequals (value, "0") || iequals (value, "off") || iequals (value, "false") ||
+	         iequals (value, "no") || iequals (value, "none"));
+}
+
 } // namespace
 
 RegistryService::RegistryService (std::string hostName, std::string hostVersion,
@@ -74,7 +86,14 @@ RegistryService::RegistryService (std::string hostName, std::string hostVersion,
 	hostKind_ = hostKindFromName (hostName_);
 
 	std::set<std::string> folders;
-	for (const auto& folder : fs::standardVST3Folders ())
+	if (includeStandardFolders ())
+	{
+		for (const auto& folder : fs::standardVST3Folders ())
+			folders.insert (fs::normalized (folder));
+	}
+	// The folders the user added themselves. This is the only way VST2 can be listed
+	// at all: that format has no standard location to fall back on.
+	for (const auto& folder : app::userPluginFolders (dataDir_))
 		folders.insert (fs::normalized (folder));
 	for (const auto& folder : extraFolders)
 	{
