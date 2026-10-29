@@ -6,9 +6,60 @@
 #include "../util/stringutil.h"
 
 #include <algorithm>
+#include <map>
 #include <set>
 
 namespace crate::registry {
+
+namespace {
+
+std::string bundleKeyOf (const Entry& entry)
+{
+	return toLower (fs::normalized (entry.bundle));
+}
+
+/** Identity of one card: the bundle plus the class inside it. A bundle can expose
+ *  several plugins, and they must stay separate cards. When the UID is still
+ *  unknown — a host cache that did not record it — fall back to the name, so a row
+ *  and an index entry describing the same plugin still collapse into one. */
+std::string identityOf (const Entry& entry)
+{
+	auto key = bundleKeyOf (entry);
+	if (key.empty ())
+		return std::string ();
+	if (!entry.uid.empty ())
+		return key + "|" + toLower (entry.uid);
+	return key + "|" + bundleMatchKey (entry.name);
+}
+
+/** A host's own name for a plugin wins; everything the host could not tell us is
+ *  filled in from what the bundle itself declares. */
+void applyIndexMetadata (Entry& entry, const Entry& fromIndex)
+{
+	if (entry.uid.empty ())
+		entry.uid = fromIndex.uid;
+	if (entry.vendor.empty ())
+		entry.vendor = fromIndex.vendor;
+	if (entry.version.empty ())
+		entry.version = fromIndex.version;
+	if (entry.sdkVersion.empty ())
+		entry.sdkVersion = fromIndex.sdkVersion;
+	if (entry.subCategories.empty ())
+		entry.subCategories = fromIndex.subCategories;
+	if (entry.category.empty ())
+		entry.category = fromIndex.category;
+	if (!entry.isInstrument)
+		entry.isInstrument = fromIndex.isInstrument;
+	if (entry.registryName.empty ())
+		entry.registryName = fromIndex.registryName;
+	if (entry.status == Status::Unknown && fromIndex.status == Status::Ready)
+	{
+		entry.status = Status::Ready;
+		entry.statusDetail = fromIndex.statusDetail;
+	}
+}
+
+} // namespace
 
 RegistryService::RegistryService (std::string hostName, std::string hostVersion,
                                   std::string dataDir, std::vector<std::string> extraFolders)
@@ -54,32 +105,18 @@ std::string RegistryService::snapshotCacheDir () const
 	return fs::join (dataDir_, "snapshots");
 }
 
+const BundleIndex& RegistryService::pluginIndex ()
+{
+	if (!bundleIndexBuilt_)
+	{
+		bundleIndex_ = BundleIndex::build (pluginFolders_);
+		bundleIndexBuilt_ = true;
+	}
+	return bundleIndex_;
+}
+
 RegistrySnapshot RegistryService::load (bool useFallbackCache)
 {
-	RegistrySnapshot snapshot;
-	snapshot.host = hostName_;
-	snapshot.hostVersion = hostVersion_;
-	snapshot.state = ReaderState::NoHost;
-
-	if (hostKind_ == HostKind::Unknown)
-	{
-		snapshot.stateDetail =
-		    "\"" + hostName_ + "\" is not a host whose plugin cache Crate has verified. "
-		    "Crate does not scan the filesystem to guess: use the explicit fallback scan "
-		    "if you want a file list that may include plugins the host rejects.";
-		return snapshot;
-	}
-
-	auto* reader = createReader (hostKind_);
-	if (!reader)
-	{
-		snapshot.stateDetail = std::string ("Crate has no verified reader for ") +
-		                       hostKindDisplayName (hostKind_) +
-		                       " yet. Adding one requires a sanitised fixture of its "
-		                       "registry from a real install; guessing is not allowed.";
-		return snapshot;
-	}
-
 	ReaderContext context;
 	context.hostName = hostName_;
 	context.hostVersion = hostVersion_;
@@ -89,16 +126,97 @@ RegistrySnapshot RegistryService::load (bool useFallbackCache)
 	if (!overridePath.empty ())
 		context.registryOverride = overridePath;
 
-	snapshot = reader->read (context);
-	snapshot.host = hostName_.empty () ? hostKindDisplayName (hostKind_) : hostName_;
-	delete reader;
+	// The index comes first: it is the only source that exists in a host nobody has
+	// written a reader for, and it is what makes the container usable in Cubase,
+	// Bitwig or Studio One instead of showing an empty grid.
+	ScannerReader scanner;
+	RegistrySnapshot snapshot = scanner.read (context);
+	snapshot.host = hostName_;
+	snapshot.hostVersion = hostVersion_;
 
-	if (snapshot.state != ReaderState::Ok && useFallbackCache)
+	if (hostKind_ != HostKind::Unknown)
+	{
+		if (auto* reader = createReader (hostKind_))
+		{
+			auto host = reader->read (context);
+			delete reader;
+			if (host.state == ReaderState::Ok && !host.entries.empty ())
+				snapshot = mergeHostOverIndex (std::move (host), snapshot);
+			else if (!host.stateDetail.empty ())
+				snapshot.stateDetail = host.stateDetail + " " + snapshot.stateDetail;
+		}
+	}
+
+	if (snapshot.entries.empty () && useFallbackCache)
 	{
 		auto reason = snapshot.stateDetail;
 		loadFallbackCache (snapshot, reason);
 	}
 	return snapshot;
+}
+
+RegistrySnapshot RegistryService::mergeHostOverIndex (RegistrySnapshot host,
+                                                      const RegistrySnapshot& index) const
+{
+	std::map<std::string, const Entry*> byIdentity;
+	std::map<std::string, const Entry*> byBundle;
+	for (const auto& entry : index.entries)
+	{
+		if (entry.bundle.empty ())
+			continue;
+		byIdentity.emplace (identityOf (entry), &entry);
+		byBundle.emplace (bundleKeyOf (entry), &entry);
+	}
+
+	std::set<std::string> claimed;
+	for (auto& entry : host.entries)
+	{
+		if (entry.bundle.empty ())
+			continue;
+		const Entry* match = nullptr;
+		auto identity = identityOf (entry);
+		if (!identity.empty ())
+		{
+			auto it = byIdentity.find (identity);
+			if (it != byIdentity.end ())
+				match = it->second;
+		}
+		if (!match)
+		{
+			auto it = byBundle.find (bundleKeyOf (entry));
+			if (it != byBundle.end ())
+				match = it->second;
+		}
+		if (!match)
+			continue;
+		applyIndexMetadata (entry, *match);
+		claimed.insert (identityOf (*match));
+	}
+
+	const size_t fromCache = host.entries.size ();
+	size_t fromDisk = 0;
+	for (const auto& entry : index.entries)
+	{
+		if (entry.bundle.empty ())
+			continue;
+		auto identity = identityOf (entry);
+		if (identity.empty () || !claimed.insert (identity).second)
+			continue;
+		auto copy = entry;
+		// Never silently pretend the host will load it: it is installed, and the
+		// host has not catalogued it yet.
+		copy.statusDetail = "Found on disk but not in this host's plugin cache yet. "
+		                    "Rescan plugins in the DAW to make the host aware of it, or "
+		                    "load it anyway.";
+		host.entries.push_back (std::move (copy));
+		++fromDisk;
+	}
+
+	host.reader = host.reader + " + " + ScannerReader ().id ();
+	host.stateDetail = std::to_string (fromCache) + " from this host's own cache, " +
+	                   std::to_string (fromDisk) + " found on disk that the host has not "
+	                   "scanned yet.";
+	return host;
 }
 
 const ModuleInfo* RegistryService::moduleInfo (const std::string& bundlePath, std::string& error)
@@ -136,7 +254,7 @@ void RegistryService::enrich (Entry& entry)
 	if (entry.bundle.empty () ||
 	    (!fs::fileExists (entry.bundle) && !fs::directoryExists (entry.bundle)))
 	{
-		auto resolved = resolveBundleByName (entry.name, pluginFolders_);
+		auto resolved = pluginIndex ().resolveByName (entry.name);
 		entry.resolution = resolved.resolution;
 		entry.bundle = resolved.path;
 		if (resolved.resolution == Resolution::Ambiguous)
@@ -211,6 +329,7 @@ void RegistryService::enrich (Entry& entry)
 void RegistryService::cacheSnapshot (Entry& entry, const ModuleInfo& info,
                                      const ModuleClassInfo& cls)
 {
+	(void) info;
 	if (cls.snapshots.empty () || entry.uid.empty ())
 		return;
 	const Snapshot* chosen = nullptr;
@@ -318,8 +437,8 @@ bool RegistryService::loadFallbackCache (RegistrySnapshot& snapshot, const std::
 	snapshot.source = path;
 	snapshot.writtenAt = fs::modifiedTime (path);
 	snapshot.stateDetail = reason +
-	                       " Showing the opt-in fallback scan instead: these entries are files "
-	                       "Crate found, not necessarily what the host will load.";
+	                       " Showing the opt-in fallback index instead: these entries come "
+	                       "from a file list, not from a scan of the plugin folders.";
 	return true;
 }
 
