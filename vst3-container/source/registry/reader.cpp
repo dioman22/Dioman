@@ -7,6 +7,7 @@
 #include "../util/stringutil.h"
 
 #include <algorithm>
+#include <cctype>
 
 namespace crate::registry {
 
@@ -109,14 +110,29 @@ std::string bundleMatchKey (const std::string& text)
 		if (ext == "vst3" || ext == "dll" || ext == "so" || ext == "vst" || ext == "dylib")
 			s = s.substr (0, dot);
 	}
-	auto strip = [] (char c) {
-		return c == ' ' || c == '_' || c == '-' || c == '\\' || c == '/';
-	};
-	s.erase (std::remove_if (s.begin (), s.end (), strip), s.end ());
+	// Anything that is not a letter or a digit is noise for comparison purposes:
+	// "Pro-Q 4", "Pro_Q_4" and "Pro Q 4" name the same plugin, and so do
+	// "Blue Cat's" and "Blue Cats". Bytes of a multi-byte UTF-8 sequence are kept
+	// untouched, so a name in a non-Latin script is not erased into an empty key.
+	s.erase (std::remove_if (s.begin (), s.end (),
+	                         [] (char ch) {
+		                         auto c = static_cast<unsigned char> (ch);
+		                         if (c >= 0x80)
+			                         return false;
+		                         return std::isalnum (c) == 0;
+	                         }),
+	         s.end ());
 	if (endsWith (s, "vst3"))
 		s.erase (s.size () - 4);
 	else if (endsWith (s, "vst"))
 		s.erase (s.size () - 3);
+	// The module on disk and the name a host recorded for it often differ only by
+	// an architecture token: REAPER writes "Filterscape_x64_.vst3" for the bundle
+	// installed as "Filterscape(x64).vst3", and "Diva_x64_.vst3" for "Diva.vst3".
+	// Without dropping the token every such entry stays unresolved forever and the
+	// card can never load.
+	for (const char* token : {"amd64", "win64", "win32", "x64", "x86"})
+		s = replaceAll (s, token, "");
 	return s;
 }
 
@@ -133,31 +149,42 @@ struct Candidate
 	std::string path;
 	std::string stem;
 };
+
+std::vector<Candidate> collectCandidates (const std::vector<fs::DirEntry>& items)
+{
+	std::vector<Candidate> candidates;
+	for (const auto& item : items)
+	{
+		if (item.isDirectory && endsWith (toLower (item.name), ".vst3"))
+			candidates.push_back ({item.path, fs::stem (item.name)});
+		else if (!item.isDirectory && looksLikePluginFile (item.name))
+			candidates.push_back ({item.path, fs::stem (item.name)});
+	}
+	return candidates;
+}
 } // namespace
 
-BundleResolution resolveBundleByName (const std::string& displayName,
-                                      const std::vector<std::string>& folders)
+BundleIndex BundleIndex::build (const std::vector<std::string>& folders)
+{
+	BundleIndex index;
+	for (const auto& folder : folders)
+	{
+		auto items = fs::listDirectoryRecursive (folder, kPluginScanDepth);
+		index.items_.insert (index.items_.end (), items.begin (), items.end ());
+	}
+	return index;
+}
+
+BundleResolution BundleIndex::resolveByName (const std::string& displayName) const
 {
 	BundleResolution result;
 	auto wanted = bundleMatchKey (displayName);
 	if (wanted.empty ())
 		return result;
 
-	std::vector<Candidate> candidates;
-	for (const auto& folder : folders)
-	{
-		for (const auto& item : fs::listDirectoryIfExists (folder))
-		{
-			if (item.isDirectory && endsWith (toLower (item.name), ".vst3"))
-				candidates.push_back ({item.path, fs::stem (item.name)});
-			else if (!item.isDirectory && looksLikePluginFile (item.name))
-				candidates.push_back ({item.path, fs::stem (item.name)});
-		}
-	}
-
 	std::vector<std::string> exact;
 	std::vector<std::string> normalized;
-	for (const auto& candidate : candidates)
+	for (const auto& candidate : collectCandidates (items_))
 	{
 		if (iequals (candidate.stem, displayName) || iequals (candidate.stem, fs::stem (displayName)))
 			exact.push_back (candidate.path);
@@ -178,8 +205,7 @@ BundleResolution resolveBundleByName (const std::string& displayName,
 	return result;
 }
 
-BundleResolution resolveBundleByFileName (const std::string& fileName,
-                                          const std::vector<std::string>& folders)
+BundleResolution BundleIndex::resolveByFileName (const std::string& fileName) const
 {
 	BundleResolution result;
 	if (fileName.empty ())
@@ -197,18 +223,15 @@ BundleResolution resolveBundleByFileName (const std::string& fileName,
 			matches.push_back (path);
 	};
 	bool exactName = false;
-	for (const auto& folder : folders)
+	for (const auto& item : items_)
 	{
-		for (const auto& item : fs::listDirectoryIfExists (folder))
+		if (iequals (item.name, fileName))
 		{
-			if (iequals (item.name, fileName))
-			{
-				addMatch (item.path);
-				exactName = true;
-			}
-			else if (bundleMatchKey (item.name) == wanted)
-				addMatch (item.path);
+			addMatch (item.path);
+			exactName = true;
 		}
+		else if (bundleMatchKey (item.name) == wanted)
+			addMatch (item.path);
 	}
 	if (matches.size () == 1)
 	{
@@ -221,6 +244,18 @@ BundleResolution resolveBundleByFileName (const std::string& fileName,
 		result.candidates = matches;
 	}
 	return result;
+}
+
+BundleResolution resolveBundleByName (const std::string& displayName,
+                                      const std::vector<std::string>& folders)
+{
+	return BundleIndex::build (folders).resolveByName (displayName);
+}
+
+BundleResolution resolveBundleByFileName (const std::string& fileName,
+                                          const std::vector<std::string>& folders)
+{
+	return BundleIndex::build (folders).resolveByFileName (fileName);
 }
 
 } // namespace crate::registry
