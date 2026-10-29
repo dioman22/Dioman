@@ -80,6 +80,9 @@ add_library(crate_core STATIC
 	source/registry/reader.cpp
 	source/registry/reaperreader.cpp
 	source/registry/registryservice.cpp
+	# The filesystem index. It is the base library source for every host, so it belongs
+	# to the core rather than to any host reader.
+	source/registry/scannerreader.cpp
 	source/state/containerstate.cpp
 	source/ui/gridmodel.cpp
 	source/util/fs.cpp
@@ -123,6 +126,7 @@ if (CRATE_BUILD_TESTS)
 		tests/test_moduleinfo.cpp
 		tests/test_params.cpp
 		tests/test_reaper.cpp
+		tests/test_scanner.cpp
 		tests/test_service.cpp
 		tests/test_slot.cpp
 		tests/test_state.cpp
