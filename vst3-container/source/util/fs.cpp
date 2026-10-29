@@ -1,5 +1,7 @@
 #include "fs.h"
 
+#include "stringutil.h"
+
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
@@ -29,6 +31,14 @@ std::string fromPath (const fsys::path& p)
 #else
 	return p.string ();
 #endif
+}
+
+/** A bundle is a plugin, not a folder to walk into. `.clap` is a single file on
+ *  Windows and a bundle on other platforms; both are leaves either way. */
+bool isPluginBundle (const std::string& name)
+{
+	auto lower = toLower (name);
+	return endsWith (lower, ".vst3") || endsWith (lower, ".clap");
 }
 } // namespace
 
@@ -136,6 +146,48 @@ std::vector<DirEntry> listDirectoryIfExists (const std::string& path)
 	if (!directoryExists (path))
 		return {};
 	return listDirectory (path);
+}
+
+std::vector<DirEntry> listDirectoryRecursive (const std::string& path, int maxDepth)
+{
+	std::vector<DirEntry> result;
+	std::error_code ec;
+	if (!fsys::is_directory (toPath (path), ec))
+		return result;
+
+	// Directories we may not enter are skipped rather than failing the walk: a
+	// plugins folder lives under Program Files, and one unreadable vendor folder
+	// must not hide the other thousand plugins.
+	fsys::recursive_directory_iterator it (toPath (path),
+	                                      fsys::directory_options::skip_permission_denied, ec);
+	if (ec)
+		return result;
+	fsys::recursive_directory_iterator end;
+	for (; it != end; it.increment (ec))
+	{
+		if (ec)
+			break; // the iterator is not usable after a failed increment
+
+		if (it.depth () > maxDepth)
+		{
+			it.disable_recursion_pending ();
+			continue;
+		}
+
+		DirEntry entry;
+		entry.path = fromPath (it->path ());
+		entry.name = fromPath (it->path ().filename ());
+		std::error_code typeEc;
+		entry.isDirectory = it->is_directory (typeEc);
+		if (entry.isDirectory && isPluginBundle (entry.name))
+			it.disable_recursion_pending ();
+		result.push_back (std::move (entry));
+	}
+
+	std::sort (result.begin (), result.end (), [] (const DirEntry& a, const DirEntry& b) {
+		return a.path < b.path;
+	});
+	return result;
 }
 
 std::string parentPath (const std::string& path)
@@ -251,6 +303,11 @@ std::vector<std::string> standardVST3Folders ()
 	auto programFiles = environmentVariable ("ProgramFiles");
 	if (!programFiles.empty ())
 		folders.push_back (join (programFiles, "Common Files\\VST3"));
+	// 32 bit VST3 bundles live in the sibling folder. They are listed so that a
+	// card can say "this is a 32 bit bundle" instead of vanishing from the grid.
+	auto programFilesX86 = environmentVariable ("ProgramFiles(x86)");
+	if (!programFilesX86.empty ())
+		folders.push_back (join (programFilesX86, "Common Files\\VST3"));
 	auto localAppData = environmentVariable ("LOCALAPPDATA");
 	if (!localAppData.empty ())
 		folders.push_back (join (localAppData, "Programs\\Common\\VST3"));

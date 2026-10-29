@@ -1,11 +1,17 @@
 // Chooses the reader for the host we are running inside, reads its registry and
 // enriches only the cards that are about to be shown. This is the only place that
 // knows about per-host formats; the plugin and the UI see RegistrySnapshot/Entry.
+//
+// The filesystem index (ScannerReader) is the *base* for every host, because it is
+// the only source that exists in a DAW whose cache we have not deciphered. A host
+// registry, when we have a verified reader for it, is an overlay on top: it answers
+// "what will this host actually load", and it never gates whether a library is shown.
 #pragma once
 
 #include "entry.h"
 #include "moduleinfo.h"
 #include "reader.h"
+#include "scannerreader.h"
 
 #include <string>
 #include <unordered_map>
@@ -50,6 +56,14 @@ private:
 	void cacheSnapshot (Entry& entry, const ModuleInfo& info, const ModuleClassInfo& cls);
 	bool loadFallbackCache (RegistrySnapshot& snapshot, const std::string& reason);
 
+	/** One walk of the plugin folders, built on first use and reused. */
+	const BundleIndex& pluginIndex ();
+
+	/** Host rows first, then everything the index found that the host has not
+	 *  catalogued yet, so nothing installed is ever invisible. */
+	RegistrySnapshot mergeHostOverIndex (RegistrySnapshot host,
+	                                     const RegistrySnapshot& index) const;
+
 	std::string hostName_;
 	std::string hostVersion_;
 	std::string dataDir_;
@@ -57,6 +71,8 @@ private:
 	std::vector<std::string> pluginFolders_;
 	std::unordered_map<std::string, CachedInfo> infoCache_;
 	std::unordered_map<std::string, std::vector<std::string>> archCache_;
+	BundleIndex bundleIndex_;
+	bool bundleIndexBuilt_ = false;
 };
 
 } // namespace crate::registry

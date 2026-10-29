@@ -1,8 +1,11 @@
 #include "../source/app/blacklist.h"
+#include "../source/app/cratepaths.h"
 #include "../source/app/journal.h"
 #include "../source/util/search.h"
 #include "test_framework.h"
 #include "test_util.h"
+
+#include <cctype>
 
 using namespace crate;
 
@@ -70,6 +73,47 @@ CRATE_TEST (blacklist_roundtrip_and_reasons)
 	CHECK (reloaded.remove ("AAAA"));
 	CHECK (!reloaded.contains ("AAAA"));
 	CHECK (!reloaded.remove ("AAAA"));
+}
+
+CRATE_TEST (user_plugin_folders_roundtrip_and_hand_edits)
+{
+	test::TempDir dir;
+	auto dataDir = dir.mkdir ("data");
+	// An absent file simply means the user has added nothing.
+	CHECK (app::userPluginFolders (dataDir).empty ());
+
+	auto vst2 = dataDir + "/vst2";
+	auto clap = dataDir + "/clap";
+	CHECK (app::addUserPluginFolder (vst2, dataDir));
+	CHECK (app::addUserPluginFolder (clap, dataDir));
+	CHECK_EQ (app::userPluginFolders (dataDir).size (), size_t (2));
+	CHECK (!app::addUserPluginFolder ("", dataDir));
+	CHECK (!app::addUserPluginFolder ("   ", dataDir));
+
+	// The same folder spelled differently must not be listed twice: a trailing
+	// separator and a different case are the two that actually happen.
+	CHECK (!app::addUserPluginFolder (vst2 + "/", dataDir));
+	CHECK_EQ (app::userPluginFolders (dataDir).size (), size_t (2));
+	std::string shouted = vst2;
+	for (char& c : shouted)
+		c = static_cast<char> (std::toupper (static_cast<unsigned char> (c)));
+	CHECK (!app::addUserPluginFolder (shouted, dataDir));
+	CHECK_EQ (app::userPluginFolders (dataDir).size (), size_t (2));
+
+	// The file is meant to be edited by hand, so comments and blank lines must be
+	// ignored rather than turned into folder entries.
+	auto path = app::pluginFoldersPath (dataDir);
+	std::string text;
+	CHECK (fs::readFile (path, text));
+	CHECK (fs::writeFile (path, text + "# a note to myself\n\n   \n"));
+	CHECK_EQ (app::userPluginFolders (dataDir).size (), size_t (2));
+
+	CHECK (app::removeUserPluginFolder (vst2 + "/", dataDir));
+	CHECK_EQ (app::userPluginFolders (dataDir).size (), size_t (1));
+	CHECK_EQ (app::userPluginFolders (dataDir)[0], clap);
+	// Removing something that is not listed changes nothing.
+	CHECK (!app::removeUserPluginFolder (vst2, dataDir));
+	CHECK_EQ (app::userPluginFolders (dataDir).size (), size_t (1));
 }
 
 CRATE_TEST (search_scores_names_and_filters)

@@ -22,7 +22,9 @@ CRATE_TEST (reaper_parses_fixture_cache)
 	std::string text;
 	CHECK (fs::readFile (test::fixture ("reaper-vstplugins64.ini"), text));
 	auto entries = parseReaperCache (text);
-	CHECK_EQ (entries.size (), size_t (7));
+	// The "<SHELL>" row and the truncated last line are not plugins and must not
+	// become entries; the two "Filterscape_x64_.vst3<id" rows are.
+	CHECK_EQ (entries.size (), size_t (9));
 
 	auto* reacomp = findByName (entries, "ReaComp");
 	CHECK (reacomp != nullptr);
@@ -59,6 +61,29 @@ CRATE_TEST (reaper_parses_fixture_cache)
 		CHECK (diva->isInstrument);
 	}
 
+	// A module that exposes three classes gets one row per class, keyed
+	// "File.vst3<id". The key suffix is not part of the file name, so the format has
+	// to be read from the key with the suffix removed.
+	auto* q6 = findByName (entries, "FilterscapeQ6");
+	CHECK (q6 != nullptr);
+	if (q6)
+	{
+		CHECK_EQ (q6->vendor, std::string ("u-he"));
+		CHECK_EQ (q6->format, std::string ("VST3"));
+		CHECK_EQ (q6->registryName, std::string ("Filterscape_x64_.vst3"));
+		CHECK (!q6->isInstrument);
+	}
+
+	auto* va = findByName (entries, "FilterscapeVA");
+	CHECK (va != nullptr);
+	if (va)
+	{
+		CHECK_EQ (va->format, std::string ("VST3"));
+		CHECK (va->isInstrument);
+	}
+
+	// The module row itself carries no class: it must not appear as a card.
+	CHECK (findByName (entries, "<SHELL>") == nullptr);
 	// "Half Written.vst3=ABCDEF" has no complete value and must not become a card.
 	CHECK (findByName (entries, "Half Written") == nullptr);
 	// Another INI section is not the cache.
@@ -89,9 +114,9 @@ CRATE_TEST (reaper_reader_resolves_and_reports_unresolved)
 
 	auto ini = dir.write ("reaper/reaper-vstplugins64.ini",
 	                      "[vstcache]\n"
-	                      "FabFilter Pro-Q 4.vst3=BD58B550F9E5634E9D2EFF39EA0927B1,1,Pro-Q 4 (FabFilter)\n"
-	                      "Diva.vst3=6E5A776FC9A34D9E9B1D8C2A1F0E4D77,2,Diva (u-he)!!!VSTi\n"
-	                      "Nowhere.vst3=00112233445566778899AABBCCDDEEFF,3,Nowhere (Nobody)\n");
+	                      "FabFilter Pro-Q 4.vst3=BD58B550F9E5634E9D2EFF39EA0927B1,1{56535441627974616D706C6520626173,Pro-Q 4 (FabFilter)\n"
+	                      "Diva.vst3=6E5A776FC9A34D9E9B1D8C2A1F0E4D77,2{D39D5B69D6AF42FA1234567844695661,Diva (u-he)!!!VSTi\n"
+	                      "Nowhere.vst3=00112233445566778899AABBCCDDEEFF,3{5653544E6F7768657265000000000000,Nowhere (Nobody)\n");
 
 	ReaderContext context;
 	context.registryOverride = ini;
@@ -120,6 +145,33 @@ CRATE_TEST (reaper_reader_resolves_and_reports_unresolved)
 	}
 }
 
+CRATE_TEST (reaper_reader_resolves_arch_token_and_nested_vendor_folder)
+{
+	test::TempDir dir;
+	auto plugins = dir.mkdir ("plugins");
+	// Both differences at once, which is how a real install looks: the bundle sits in
+	// a vendor subfolder and its name carries no architecture token, while the cache
+	// key does.
+	test::makeBundle (dir, "plugins/u-he/Diva.vst3", "6E5A776FC9A34D9E9B1D8C2A1F0E4D77", "Diva",
+	                  "u-he", {"Instrument", "Instrument|Synth"});
+	auto ini = dir.write ("cache.ini",
+	                      "[vstcache]\n"
+	                      "Diva_x64_.vst3=00225DD317F5DA01,1702226742{D39D5B69D6AF42FA1234567844695661,Diva (u-he)!!!VSTi\n");
+	ReaderContext context;
+	context.registryOverride = ini;
+	context.pluginFolders = {plugins};
+	ReaperReader reader;
+	auto snapshot = reader.read (context);
+	CHECK_EQ (snapshot.entries.size (), size_t (1));
+	if (!snapshot.entries.empty ())
+	{
+		const auto& entry = snapshot.entries[0];
+		CHECK_EQ (entry.registryName, std::string ("Diva_x64_.vst3"));
+		CHECK (entry.resolution != Resolution::Unresolved);
+		CHECK (fs::directoryExists (entry.bundle));
+	}
+}
+
 CRATE_TEST (reaper_reader_marks_ambiguous_names)
 {
 	test::TempDir dir;
@@ -127,7 +179,7 @@ CRATE_TEST (reaper_reader_marks_ambiguous_names)
 	auto b = dir.mkdir ("b");
 	test::makeBundle (dir, "a/Twin.vst3", "00112233445566778899AABBCCDDEEFF", "Twin", "A", {"Fx"});
 	test::makeBundle (dir, "b/Twin.vst3", "FFEEDDCCBBAA99887766554433221100", "Twin", "B", {"Fx"});
-	auto ini = dir.write ("cache.ini", "[vstcache]\nTwin.vst3=AABBCCDDEEFF00112233445566778899,1,Twin (A)\n");
+	auto ini = dir.write ("cache.ini", "[vstcache]\nTwin.vst3=AABBCCDDEEFF00112233445566778899,1{Twin0000000000000000000000000000,Twin (A)\n");
 	ReaderContext context;
 	context.registryOverride = ini;
 	context.pluginFolders = {a, b};
