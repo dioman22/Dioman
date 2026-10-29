@@ -81,6 +81,25 @@ std::vector<std::string> reaperVstPaths (const std::string& resourceDir)
 	return paths;
 }
 
+/** Everything from the first '<' on is a REAPER-local class identifier, not part
+ *  of the file name: "Thing.vst3<123456" is the bundle "Thing.vst3". */
+std::string stripClassSuffix (const std::string& key)
+{
+	auto suffix = key.find ('<');
+	if (suffix == std::string::npos)
+		return key;
+	return std::string (trimView (key.substr (0, suffix)));
+}
+
+/** REAPER writes "<SHELL>" in the display field of a module row that carries no
+ *  class of its own; the classes are the separate "Thing.vst3<id" rows. Such a row
+ *  has no name, no vendor and nothing that can be loaded, so it must not become a
+ *  card — treating it as one produced a grid full of "<SHELL> / unknown vendor". */
+bool isPlaceholderName (const std::string& name)
+{
+	return name.size () >= 2 && name.front () == '<' && name.back () == '>';
+}
+
 } // namespace
 
 void parseReaperDisplayName (const std::string& raw, std::string& name, std::string& vendor,
@@ -156,19 +175,43 @@ std::vector<Entry> parseReaperCache (const std::string& text)
 		if (fields.size () < 2)
 			continue;
 
+		// Real [vstcache] rows look like this:
+		//
+		//   Thing.vst3=0032BE7E7159D801,1628748483{56535441627974616D706C6520626173,Thing (Vendor)
+		//   Shell.vst3=0030CE162AE0D901,0,<SHELL>
+		//   Shell.vst3<86606732=0030CE162AE0D901,86606732{D39D5B69D6AF42FA12345678414D4551,One (u-he)
+		//
+		// so the class id and the class UID live in the field before the display
+		// name, and a vendor name may itself contain a comma. Only the first two
+		// fields are positional, which is why the name is everything from index 2 on.
+		std::string display;
+		if (fields.size () >= 3)
+		{
+			std::vector<std::string> tail (fields.begin () + 2, fields.end ());
+			display = join (tail, ",");
+		}
+		else
+			display = fields.back ();
+
+		auto fileKey = stripClassSuffix (key);
+		if (fileKey.empty ())
+			continue;
+
 		Entry entry;
 		entry.source = "reaper-ini";
-		auto display = fields.back ();
 		parseReaperDisplayName (display, entry.name, entry.vendor, entry.isInstrument);
-		if (entry.name.empty ())
+		if (entry.name.empty () || isPlaceholderName (entry.name))
 			continue;
-		auto ext = toLower (fs::extension (key));
+		// The extension has to come from the stripped key: on a shell row the raw
+		// key ends in ".vst3<id", which is not an extension, so the format stayed
+		// empty and the card never got its VST3 badge.
+		auto ext = toLower (fs::extension (fileKey));
 		if (ext == ".vst3")
 			entry.format = "VST3";
 		else if (ext == ".dll" || ext == ".so" || ext == ".dylib")
 			entry.format = "VST";
 		entry.hostScanState = std::strtoll (fields[1].c_str (), nullptr, 10);
-		entry.registryName = key;
+		entry.registryName = fileKey;
 		entries.push_back (std::move (entry));
 	}
 	return entries;
@@ -233,9 +276,13 @@ RegistrySnapshot ReaperReader::read (const ReaderContext& context) const
 	for (auto& path : context.extraSearchPaths)
 		searchFolders.push_back (path);
 
+	// One walk of the plugin folders for the whole cache: a real [vstcache] holds
+	// well over a thousand rows, and resolving each of them on its own would walk
+	// the library once per row.
+	auto index = BundleIndex::build (searchFolders);
 	for (auto& entry : snapshot.entries)
 	{
-		auto resolved = resolveBundleByFileName (entry.registryName, searchFolders);
+		auto resolved = index.resolveByFileName (entry.registryName);
 		entry.resolution = resolved.resolution;
 		entry.bundle = resolved.path;
 		if (resolved.resolution == Resolution::Unresolved)
