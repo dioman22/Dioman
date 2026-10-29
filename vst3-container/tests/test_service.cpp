@@ -71,6 +71,8 @@ CRATE_TEST (registry_service_reads_reader_and_enriches_lazily)
 	RegistryService service ("REAPER", "7.99", dataDir, {plugins});
 	auto snapshot = service.load (false);
 	CHECK (snapshot.state == ReaderState::Ok);
+	// The host listed three plugins and the index found the two that exist on disk, so
+	// the union is still three cards: nothing is duplicated and nothing is invented.
 	CHECK_EQ (snapshot.entries.size (), size_t (3));
 	CHECK_EQ(snapshot.source, ini);
 
@@ -115,17 +117,31 @@ CRATE_TEST (registry_service_reads_reader_and_enriches_lazily)
 	clearRegistryVar ();
 }
 
-CRATE_TEST (registry_service_explains_unknown_host_and_fallback)
+CRATE_TEST (registry_service_works_in_a_host_it_cannot_read)
 {
 	test::TempDir dir;
 	auto dataDir = dir.mkdir ("data");
-	RegistryService unknown ("Some DAW", "1.0", dataDir);
-	auto snapshot = unknown.load (false);
-	CHECK (snapshot.state == ReaderState::NoHost);
-	CHECK (snapshot.stateDetail.find ("Some DAW") != std::string::npos);
-	CHECK (snapshot.entries.empty ());
+	auto plugins = dir.mkdir ("plugins");
+	test::makeBundle (dir, "plugins/Crate.vst3", "00112233445566778899AABBCCDDEEFF", "Crate",
+	                  "Crate Audio", {"Fx"});
 
-	// Fallback cache: opt-in, explicitly labelled.
+	// A DAW whose private cache Crate has never deciphered. The library must still be
+	// there, because reading the plugin folders ourselves is the whole point: gating the
+	// grid on a per-host reader is what left Cubase and Bitwig with an empty window.
+	RegistryService unknown ("Some DAW", "1.0", dataDir, {plugins});
+	auto snapshot = unknown.load (false);
+	CHECK (snapshot.state == ReaderState::Ok);
+	CHECK_EQ (std::string (snapshot.reader), std::string ("vst3-fs@1"));
+	CHECK_EQ (snapshot.entries.size (), size_t (1));
+	if (!snapshot.entries.empty ())
+	{
+		CHECK_EQ (snapshot.entries[0].name, std::string ("Crate"));
+		CHECK_EQ (snapshot.entries[0].source, std::string ("vst3-fs"));
+		CHECK (snapshot.entries[0].resolution == Resolution::Exact);
+	}
+
+	// The opt-in fallback index is now a last resort: it is only consulted when neither
+	// the index nor the host cache produced a single row.
 	std::string cached = R"({
 		"scanner": "crate-scan@1",
 		"entries": [
@@ -136,9 +152,13 @@ CRATE_TEST (registry_service_explains_unknown_host_and_fallback)
 	})";
 	dir.write ("data/fallback-index.json", cached);
 	setRegistryVar ("/nonexistent/reaper-vstplugins64.ini");
+	// No plugin folder is configured here, so the index finds nothing and the host cache
+	// is missing: without the opt-in the grid stays empty.
 	RegistryService reaper ("REAPER", "7.99", dataDir);
+	auto justIndex = reaper.load (false);
+	CHECK (justIndex.entries.empty ());
+
 	auto fallback = reaper.load (true);
-	CHECK (fallback.state == ReaderState::NotFound);
 	CHECK_EQ (fallback.entries.size (), size_t (1));
 	if (!fallback.entries.empty ())
 	{
@@ -147,12 +167,6 @@ CRATE_TEST (registry_service_explains_unknown_host_and_fallback)
 		CHECK (fallback.entries[0].resolution == Resolution::Unresolved);
 	}
 	CHECK (fallback.stateDetail.find ("fallback") != std::string::npos);
-
-	// Without the opt-in, the fallback cache is never used.
-	RegistryService reaper2 ("REAPER", "7.99", dataDir);
-	auto noFallback = reaper2.load (false);
-	CHECK (noFallback.state == ReaderState::NotFound);
-	CHECK (noFallback.entries.empty ());
 	clearRegistryVar ();
 }
 
