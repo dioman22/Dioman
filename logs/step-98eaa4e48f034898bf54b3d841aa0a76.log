@@ -1,0 +1,5 @@
+Submodule 'cmake' (https://github.com/steinbergmedia/vst3_cmake) registered for path 'cmake'
+Cloning into 'D:/a/_temp/vst3sdk/cmake'...
+From https://github.com/steinbergmedia/vst3_cmake
+ * branch            970594cd6d82f866e5115553e5171e96d4bbf449 -> FETCH_HEAD
+Submodule path 'cmake': checked out '970594cd6d82f866e5115553e5171e96d4bbf449'

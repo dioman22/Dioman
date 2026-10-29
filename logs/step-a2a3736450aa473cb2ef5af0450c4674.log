@@ -1,0 +1,165 @@
+Test project D:/a/Dioman/Dioman/build
+    Start 1: crate_tests
+1/1 Test #1: crate_tests ......................***Failed    1.46 sec
+crate: slot 1 prepare said: fake plugin refuses to start
+[ RUN      ] journal_detects_unfinished_load
+[       OK ] journal_detects_unfinished_load
+[ RUN      ] journal_escapes_separators
+[       OK ] journal_escapes_separators
+[ RUN      ] blacklist_roundtrip_and_reasons
+[       OK ] blacklist_roundtrip_and_reasons
+[ RUN      ] user_plugin_folders_roundtrip_and_hand_edits
+[       OK ] user_plugin_folders_roundtrip_and_hand_edits
+[ RUN      ] search_scores_names_and_filters
+[       OK ] search_scores_names_and_filters
+[ RUN      ] chain_is_bit_transparent_when_empty
+[       OK ] chain_is_bit_transparent_when_empty
+[ RUN      ] chain_runs_slots_in_series
+[       OK ] chain_runs_slots_in_series
+[ RUN      ] chain_sums_latency_and_tail_of_loaded_slots
+[       OK ] chain_sums_latency_and_tail_of_loaded_slots
+[ RUN      ] chain_degrades_a_failing_slot_to_pass_through
+[       OK ] chain_degrades_a_failing_slot_to_pass_through
+[ RUN      ] chain_can_be_released_and_prepared_again
+[       OK ] chain_can_be_released_and_prepared_again
+[ RUN      ] chain_never_returns_stale_samples_past_the_prepared_block
+[       OK ] chain_never_returns_stale_samples_past_the_prepared_block
+[ RUN      ] fl_scans_categories_from_fixture_folder
+[       OK ] fl_scans_categories_from_fixture_folder
+[ RUN      ] fl_reader_resolves_bundles_and_reports_missing_folder
+[       OK ] fl_reader_resolves_bundles_and_reports_missing_folder
+[ RUN      ] bundle_match_key_is_stable
+[       OK ] bundle_match_key_is_stable
+[ RUN      ] grid_filters_and_sorts_by_search
+[       OK ] grid_filters_and_sorts_by_search
+[ RUN      ] grid_layout_rectangles_do_not_overlap_and_hit_test
+[       OK ] grid_layout_rectangles_do_not_overlap_and_hit_test
+[ RUN      ] grid_content_height_covers_every_row
+[       OK ] grid_content_height_covers_every_row
+[ RUN      ] grid_keeps_the_selected_plugin_across_a_refresh
+[       OK ] grid_keeps_the_selected_plugin_across_a_refresh
+[ RUN      ] grid_keyboard_selection_stays_inside_the_list
+[       OK ] grid_keyboard_selection_stays_inside_the_list
+[ RUN      ] grid_filters_hide_instruments_and_unresolved
+[       OK ] grid_filters_hide_instruments_and_unresolved
+[ RUN      ] json_parses_moduleinfo_like_text
+[       OK ] json_parses_moduleinfo_like_text
+[ RUN      ] json_accepts_single_quotes_and_escapes
+[       OK ] json_accepts_single_quotes_and_escapes
+[ RUN      ] json_handles_numbers_and_nesting
+[       OK ] json_handles_numbers_and_nesting
+[ RUN      ] json_reports_errors_with_position
+[       OK ] json_reports_errors_with_position
+[ RUN      ] json_strip_json5_keeps_strings_intact
+[       OK ] json_strip_json5_keeps_strings_intact
+[ RUN      ] json_rejects_trailing_garbage
+[       OK ] json_rejects_trailing_garbage
+[ RUN      ] live_reads_fixture_database
+[       OK ] live_reads_fixture_database
+[ RUN      ] live_reports_unsupported_schema
+[       OK ] live_reports_unsupported_schema
+[ RUN      ] live_missing_database_is_not_a_crash
+[       OK ] live_missing_database_is_not_a_crash
+[ RUN      ] live_reads_from_copy_when_host_holds_exclusive_lock
+[       OK ] live_reads_from_copy_when_host_holds_exclusive_lock
+[ RUN      ] moduleinfo_parses_sdk_shape
+[       OK ] moduleinfo_parses_sdk_shape
+[ RUN      ] moduleinfo_reads_bundle_and_snapshot_path
+[       OK ] moduleinfo_reads_bundle_and_snapshot_path
+[ RUN      ] binary_arch_detection_uses_headers_only
+[       OK ] binary_arch_detection_uses_headers_only
+[ RUN      ] params_slot_ids_round_trip
+[       OK ] params_slot_ids_round_trip
+[ RUN      ] params_reject_ids_outside_the_map
+[       OK ] params_reject_ids_outside_the_map
+[ RUN      ] params_titles_and_formatting
+[       OK ] params_titles_and_formatting
+[ RUN      ] params_normalisation_is_lossless_enough
+[       OK ] params_normalisation_is_lossless_enough
+[ RUN      ] params_defaults_and_stepping
+[       OK ] params_defaults_and_stepping
+[ RUN      ] reaper_parses_fixture_cache
+[       OK ] reaper_parses_fixture_cache
+[ RUN      ] reaper_reader_reports_missing_cache
+[       OK ] reaper_reader_reports_missing_cache
+[ RUN      ] reaper_reader_resolves_and_reports_unresolved
+[       OK ] reapFAIL D:\a\Dioman\Dioman\vst3-container\tests\test_service.cpp:76: CHECK_EQ(snapshot.entries.size (), size_t (3)) failed
+FAIL D:\a\Dioman\Dioman\vst3-container\tests\test_service.cpp:135: CHECK_EQ(snapshot.entries.size (), size_t (1)) failed
+FAIL D:\a\Dioman\Dioman\vst3-container\tests\test_service.cpp:159: CHECK(justIndex.entries.empty ()) failed
+FAIL D:\a\Dioman\Dioman\vst3-container\tests\test_service.cpp:162: CHECK_EQ(fallback.entries.size (), size_t (1)) failed
+FAIL D:\a\Dioman\Dioman\vst3-container\tests\test_service.cpp:165: CHECK_EQ(fallback.entries[0].name, std::string ("Fallback Plugin")) failed
+FAIL D:\a\Dioman\Dioman\vst3-container\tests\test_service.cpp:166: CHECK_EQ(fallback.entries[0].source, std::string ("scanner-fallback")) failed
+FAIL D:\a\Dioman\Dioman\vst3-container\tests\test_service.cpp:167: CHECK(fallback.entries[0].resolution == Resolution::Unresolved) failed
+FAIL D:\a\Dioman\Dioman\vst3-container\tests\test_service.cpp:169: CHECK(fallback.stateDetail.find ("fallback") != std::string::npos) failed
+er_reader_resolves_and_reports_unresolved
+[ RUN      ] reaper_reader_resolves_arch_token_and_nested_vendor_folder
+[       OK ] reaper_reader_resolves_arch_token_and_nested_vendor_folder
+[ RUN      ] reaper_reader_marks_ambiguous_names
+[       OK ] reaper_reader_marks_ambiguous_names
+[ RUN      ] host_names_map_to_readers
+[       OK ] host_names_map_to_readers
+[ RUN      ] scanner_reads_a_folder_without_any_host
+[       OK ] scanner_reads_a_folder_without_any_host
+[ RUN      ] scanner_finds_bundles_in_vendor_subfolders
+[       OK ] scanner_finds_bundles_in_vendor_subfolders
+[ RUN      ] scanner_makes_one_card_per_audio_module_class
+[       OK ] scanner_makes_one_card_per_audio_module_class
+[ RUN      ] scanner_reports_a_bundle_it_cannot_describe
+[       OK ] scanner_reports_a_bundle_it_cannot_describe
+[ RUN      ] scanner_does_not_walk_into_a_bundle
+[       OK ] scanner_does_not_walk_into_a_bundle
+[ RUN      ] scanner_respects_the_depth_cap
+[       OK ] scanner_respects_the_depth_cap
+[ RUN      ] scanner_lists_a_bundle_once_when_two_folders_overlap
+[       OK ] scanner_lists_a_bundle_once_when_two_folders_overlap
+[ RUN      ] registry_service_reads_reader_and_enriches_lazily
+[  FAILED  ] registry_service_reads_reader_and_enriches_lazily
+[ RUN      ] registry_service_works_in_a_host_it_cannot_read
+[  FAILED  ] registry_service_works_in_a_host_it_cannot_read
+[ RUN      ] registry_service_marks_blacklist_without_hiding
+[       OK ] registry_service_marks_blacklist_without_hiding
+[ RUN      ] slot_is_bit_transparent_when_empty
+[       OK ] slot_is_bit_transparent_when_empty
+[ RUN      ] slot_reports_plugin_latency_and_tail
+[       OK ] slot_reports_plugin_latency_and_tail
+[ RUN      ] slot_dry_path_is_delayed_by_plugin_latency
+[       OK ] slot_dry_path_is_delayed_by_plugin_latency
+[ RUN      ] slot_wet_and_dry_stay_in_phase
+[       OK ] slot_wet_and_dry_stay_in_phase
+[ RUN      ] slot_bypass_ramps_instead_of_stepping
+[       OK ] slot_bypass_ramps_instead_of_stepping
+[ RUN      ] slot_scrubs_nan_and_inf_from_plugin_output
+[       OK ] slot_scrubs_nan_and_inf_from_plugin_output
+[ RUN      ] slot_clamps_mix
+[       OK ] slot_clamps_mix
+[ RUN      ] slot_failure_is_a_passthrough_with_a_status
+[       OK ] slot_failure_is_a_passthrough_with_a_status
+[ RUN      ] slot_refuses_to_load_while_prepared
+[       OK ] slot_refuses_to_load_while_prepared
+[ RUN      ] slot_hosts_a_mono_plugin_on_a_stereo_track
+[       OK ] slot_hosts_a_mono_plugin_on_a_stereo_track
+[ RUN      ] slot_propagates_silence_flags
+[       OK ] slot_propagates_silence_flags
+[ RUN      ] delay_line_reads_back_delayed_audio
+[       OK ] delay_line_reads_back_delayed_audio
+[ RUN      ] channel_mapping_survives_odd_layouts
+[       OK ] channel_mapping_survives_odd_layouts
+[ RUN      ] state_roundtrips_with_hosted_blobs
+[       OK ] state_roundtrips_with_hosted_blobs
+[ RUN      ] state_reads_v1_and_migrates_defaults
+[       OK ] state_reads_v1_and_migrates_defaults
+[ RUN      ] state_rejects_corruption_and_future_versions
+[       OK ] state_rejects_corruption_and_future_versions
+[ RUN      ] state_clamps_out_of_range_values
+[       OK ] state_clamps_out_of_range_values
+
+1671 checks, 8 failures, 71 tests, 2 failed tests
+
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =   1.51 sec
+
+The following tests FAILED:
+	  1 - crate_tests (Failed)
+Errors while running CTest

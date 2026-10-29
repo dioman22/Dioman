@@ -1,0 +1,5 @@
+Submodule 'pluginterfaces' (https://github.com/steinbergmedia/vst3_pluginterfaces) registered for path 'pluginterfaces'
+Cloning into 'D:/a/_temp/vst3sdk/pluginterfaces'...
+From https://github.com/steinbergmedia/vst3_pluginterfaces
+ * branch            cf187058ae79fe557fd854f2cc66a2b587d8cbe9 -> FETCH_HEAD
+Submodule path 'pluginterfaces': checked out 'cf187058ae79fe557fd854f2cc66a2b587d8cbe9'

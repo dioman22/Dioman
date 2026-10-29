@@ -1,0 +1,344 @@
+MSBuild version 18.11.1-1.26513.3+940033be3 for .NET Framework
+
+  1>Checking Build System
+  Building Custom Rule D:/a/_temp/vst3sdk/base/CMakeLists.txt
+  baseiids.cpp
+  fbuffer.cpp
+  fdebug.cpp
+  fdynlib.cpp
+  fobject.cpp
+  fstreamer.cpp
+  fstring.cpp
+  timer.cpp
+  updatehandler.cpp
+  fcondition.cpp
+  flock.cpp
+  base.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\base.lib
+  Building Custom Rule D:/a/Dioman/Dioman/vst3-container/CMakeLists.txt
+  sqlite3.c
+  crate_sqlite.vcxproj -> D:\a\Dioman\Dioman\build\Release\crate_sqlite.lib
+  Building Custom Rule D:/a/Dioman/Dioman/vst3-container/CMakeLists.txt
+  cratepaths.cpp
+  journal.cpp
+  blacklist.cpp
+  audioops.cpp
+  chain.cpp
+  params.cpp
+  slot.cpp
+  json.cpp
+  binaryinfo.cpp
+  entry.cpp
+  flreader.cpp
+  livereader.cpp
+  moduleinfo.cpp
+  reader.cpp
+  reaperreader.cpp
+  registryservice.cpp
+  scannerreader.cpp
+  containerstate.cpp
+  gridmodel.cpp
+  fs.cpp
+  Generating Code...
+  Compiling...
+  search.cpp
+  stringutil.cpp
+  Generating Code...
+  crate_core.vcxproj -> D:\a\Dioman\Dioman\build\Release\crate_core.lib
+  Building Custom Rule D:/a/Dioman/Dioman/build/_deps/vstgui-src/vstgui/lib/CMakeLists.txt
+  animations.cpp
+  animator.cpp
+  timingfunctions.cpp
+  cbitmap.cpp
+  cbitmapfilter.cpp
+  cclipboard.cpp
+  ccolor.cpp
+  cdatabrowser.cpp
+  cdrawcontext.cpp
+  cdrawmethods.cpp
+  cdropsource.cpp
+  cexternalview.cpp
+  cfileselector.cpp
+  cfont.cpp
+  cframe.cpp
+  cgradient.cpp
+  cgradientview.cpp
+  cgraphicspath.cpp
+  clayeredviewcontainer.cpp
+  clinestyle.cpp
+  coffscreencontext.cpp
+  cautoanimation.cpp
+  cbuttons.cpp
+  ccolorchooser.cpp
+  ccontrol.cpp
+  cfontchooser.cpp
+  cknob.cpp
+  clistcontrol.cpp
+  cmoviebitmap.cpp
+  cmoviebutton.cpp
+  coptionmenu.cpp
+  cparamdisplay.cpp
+  cscrollbar.cpp
+  csearchtextedit.cpp
+  csegmentbutton.cpp
+  cslider.cpp
+  cspecialdigit.cpp
+  csplashscreen.cpp
+  cstringlist.cpp
+  cswitch.cpp
+  ctextedit.cpp
+  ctextlabel.cpp
+  cvumeter.cpp
+  cxypad.cpp
+  copenglview.cpp
+  cpoint.cpp
+  crect.cpp
+  crowcolumnview.cpp
+  cscrollview.cpp
+  cshadowviewcontainer.cpp
+  csplitview.cpp
+  cstring.cpp
+  ctabview.cpp
+  ctooltipsupport.cpp
+  cview.cpp
+  cviewcontainer.cpp
+  cvstguitimer.cpp
+  events.cpp
+  genericstringlistdatabrowsersource.cpp
+  pixelbuffer.cpp
+  platformfactory.cpp
+  fileresourceinputstream.cpp
+  genericoptionmenu.cpp
+  generictextedit.cpp
+  vstguidebug.cpp
+  vstguiinit.cpp
+  d2dbitmap.cpp
+  d2dbitmapcache.cpp
+  d2dfont.cpp
+  d2dgradient.cpp
+  d2dgraphicscontext.cpp
+  d2dgraphicspath.cpp
+  win32datapackage.cpp
+  win32directcomposition.cpp
+  win32dragging.cpp
+  win32factory.cpp
+  win32frame.cpp
+  win32openglview.cpp
+  win32optionmenu.cpp
+  win32resourcestream.cpp
+  win32support.cpp
+  win32textedit.cpp
+  win32viewlayer.cpp
+  winfileselector.cpp
+  winstring.cpp
+  wintimer.cpp
+  vstgui.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\vstgui.lib
+  Building Custom Rule D:/a/Dioman/Dioman/build/_deps/vstgui-src/vstgui/uidescription/CMakeLists.txt
+  compresseduidescription.cpp
+  cstream.cpp
+  uiattributes.cpp
+  uicontentprovider.cpp
+  uidescription.cpp
+  uiviewcreator.cpp
+  uiviewfactory.cpp
+  uiviewswitchcontainer.cpp
+  xmlparser.cpp
+  uidesclist.cpp
+  uijsonpersistence.cpp
+  uinode.cpp
+  uixmlpersistence.cpp
+  uiactions.cpp
+  uiattributescontroller.cpp
+  uibitmapscontroller.cpp
+  uicolor.cpp
+  uicolorchoosercontroller.cpp
+  uicolorscontroller.cpp
+  uicolorslider.cpp
+  uicrosslines.cpp
+  uidialogcontroller.cpp
+  uieditcontroller.cpp
+  uieditmenucontroller.cpp
+  uieditview.cpp
+  uifocussettingscontroller.cpp
+  uifontscontroller.cpp
+  uigradientscontroller.cpp
+  uigridcontroller.cpp
+  uioverlayview.cpp
+  uiselection.cpp
+  uitagscontroller.cpp
+  uitemplatecontroller.cpp
+  uitemplatesettingscontroller.cpp
+  uiundomanager.cpp
+  uiviewcreatecontroller.cpp
+  animationsplashscreencreator.cpp
+  animknobcreator.cpp
+  autoanimationcreator.cpp
+  checkboxcreator.cpp
+  controlcreator.cpp
+  gradientviewcreator.cpp
+  kickbuttoncreator.cpp
+  knobcreator.cpp
+  layeredviewcontainercreator.cpp
+  moviebitmapcreator.cpp
+  moviebuttoncreator.cpp
+  multibitmapcontrolcreator.cpp
+  multilinetextlabelcreator.cpp
+  onoffbuttoncreator.cpp
+  optionmenucreator.cpp
+  paramdisplaycreator.cpp
+  rockerswitchcreator.cpp
+  rowcolumnviewcreator.cpp
+  scrollviewcreator.cpp
+  searchtexteditcreator.cpp
+  segmentbuttoncreator.cpp
+  shadowviewcontainercreator.cpp
+  sliderviewcreator.cpp
+  splitviewcreator.cpp
+  stringlistcontrolcreator.cpp
+  switchcreators.cpp
+  textbuttoncreator.cpp
+  texteditcreator.cpp
+  textlabelcreator.cpp
+  uiviewswitchcontainercreator.cpp
+  viewcontainercreator.cpp
+  viewcreator.cpp
+  vumetercreator.cpp
+  xypadcreator.cpp
+  vstgui_uidescription.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\vstgui_uidescription.lib
+  Building Custom Rule D:/a/Dioman/Dioman/vst3-container/CMakeLists.txt
+  vst3groupcontroller.cpp
+  vst3padcontroller.cpp
+  vst3editor.cpp
+  vstguieditor.cpp
+  crate_vstgui_support.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\crate_vstgui_support.lib
+  Building Custom Rule D:/a/_temp/vst3sdk/pluginterfaces/CMakeLists.txt
+  conststringtable.cpp
+  coreiids.cpp
+  funknown.cpp
+  ustring.cpp
+  pluginterfaces.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\pluginterfaces.lib
+  Building Custom Rule D:/a/_temp/vst3sdk/public.sdk/CMakeLists.txt
+  commoniids.cpp
+  openurl.cpp
+  systemclipboard_linux.cpp
+  systemclipboard_win32.cpp
+  threadchecker_linux.cpp
+  threadchecker_win32.cpp
+  readfile.cpp
+  vstpresetfile.cpp
+  sdk_common.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\sdk_common.lib
+  Building Custom Rule D:/a/_temp/vst3sdk/public.sdk/CMakeLists.txt
+  connectionproxy.cpp
+  eventlist.cpp
+  hostclasses.cpp
+  module.cpp
+  parameterchanges.cpp
+  pluginterfacesupport.cpp
+  processdata.cpp
+  stringconvert.cpp
+  vstinitiids.cpp
+  sdk_hosting.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\sdk_hosting.lib
+  Building Custom Rule D:/a/_temp/vst3sdk/public.sdk/samples/vst-utilities/moduleinfotool/CMakeLists.txt
+  main.cpp
+  moduleinfocreator.cpp
+  moduleinfoparser.cpp
+  module_win32.cpp
+  moduleinfotool.vcxproj -> D:\a\Dioman\Dioman\build\bin\Release\moduleinfotool.exe
+  Building Custom Rule D:/a/_temp/vst3sdk/public.sdk/CMakeLists.txt
+  pluginview.cpp
+  pluginfactory.cpp
+  moduleinit.cpp
+  dataexchange.cpp
+  stringconvert.cpp
+  systemtime.cpp
+  testing.cpp
+  vst2persistence.cpp
+  vstaudioeffect.cpp
+  vstbus.cpp
+  vstcomponent.cpp
+  vstcomponentbase.cpp
+  vsteditcontroller.cpp
+  vstinitiids.cpp
+  vstnoteexpressiontypes.cpp
+  vstparameters.cpp
+  vstrepresentation.cpp
+  sdk.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\sdk.lib
+  Building Custom Rule D:/a/Dioman/Dioman/vst3-container/CMakeLists.txt
+  crateentry.cpp
+  cratecontroller.cpp
+  crateprocessor.cpp
+  hostcontext.cpp
+  vst3instance.cpp
+  vst3loader.cpp
+  crateeditor.cpp
+  memorystream.cpp
+  module_win32.cpp
+  dllmain.cpp
+     Creating library D:/a/Dioman/Dioman/build/lib/Release/Crate.lib and object D:/a/Dioman/Dioman/build/lib/Release/Crate.exp
+  Crate.vcxproj -> D:\a\Dioman\Dioman\build\VST3\Release\Crate.vst3\Contents\x86_64-win\Crate.vst3
+  [SMTG] Copy PlugIn.ico and desktop.ini and change their attributes.		
+  [SMTG] Delete previous link...
+  [SMTG] Creation of the new link...
+  [SMTG] Finished.
+MSBuild version 18.11.1-1.26513.3+940033be3 for .NET Framework
+
+  crate_sqlite.vcxproj -> D:\a\Dioman\Dioman\build\Release\crate_sqlite.lib
+  crate_core.vcxproj -> D:\a\Dioman\Dioman\build\Release\crate_core.lib
+MSBuild version 18.11.1-1.26513.3+940033be3 for .NET Framework
+
+  base.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\base.lib
+  pluginterfaces.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\pluginterfaces.lib
+  sdk_common.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\sdk_common.lib
+  sdk_hosting.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\sdk_hosting.lib
+  moduleinfotool.vcxproj -> D:\a\Dioman\Dioman\build\bin\Release\moduleinfotool.exe
+  sdk.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\sdk.lib
+  Building Custom Rule D:/a/Dioman/Dioman/vst3-container/CMakeLists.txt
+  gainplugin.cpp
+  dllmain.cpp
+     Creating library D:/a/Dioman/Dioman/build/lib/Release/CrateGainFixture.lib and object D:/a/Dioman/Dioman/build/lib/Release/CrateGainFixture.exp
+  CrateGainFixture.vcxproj -> D:\a\Dioman\Dioman\build\VST3\Release\CrateGainFixture.vst3\Contents\x86_64-win\CrateGainFixture.vst3
+  [SMTG] Copy PlugIn.ico and desktop.ini and change their attributes.		
+  [SMTG] Delete previous link...
+  [SMTG] Creation of the new link...
+  [SMTG] Finished.
+MSBuild version 18.11.1-1.26513.3+940033be3 for .NET Framework
+
+  base.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\base.lib
+  pluginterfaces.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\pluginterfaces.lib
+  sdk_common.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\sdk_common.lib
+  sdk_hosting.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\sdk_hosting.lib
+  moduleinfotool.vcxproj -> D:\a\Dioman\Dioman\build\bin\Release\moduleinfotool.exe
+  sdk.vcxproj -> D:\a\Dioman\Dioman\build\lib\Release\sdk.lib
+  CrateGainFixture.vcxproj -> D:\a\Dioman\Dioman\build\VST3\Release\CrateGainFixture.vst3\Contents\x86_64-win\CrateGainFixture.vst3
+  [SMTG] Copy PlugIn.ico and desktop.ini and change their attributes.		
+  [SMTG] Delete previous link...
+  [SMTG] Creation of the new link...
+  [SMTG] Finished.
+  crate_sqlite.vcxproj -> D:\a\Dioman\Dioman\build\Release\crate_sqlite.lib
+  crate_core.vcxproj -> D:\a\Dioman\Dioman\build\Release\crate_core.lib
+  Building Custom Rule D:/a/Dioman/Dioman/vst3-container/CMakeLists.txt
+  hosting_check.cpp
+  memorystream.cpp
+  module_win32.cpp
+  crate_hosting_check.vcxproj -> D:\a\Dioman\Dioman\build\bin\Release\crate_hosting_check.exe
+MSBuild version 18.11.1-1.26513.3+940033be3 for .NET Framework
+
+  crate_sqlite.vcxproj -> D:\a\Dioman\Dioman\build\Release\crate_sqlite.lib
+  crate_core.vcxproj -> D:\a\Dioman\Dioman\build\Release\crate_core.lib
+  Building Custom Rule D:/a/Dioman/Dioman/vst3-container/CMakeLists.txt
+  test_main.cpp
+  test_app.cpp
+  test_chain.cpp
+  test_fl.cpp
+  test_grid.cpp
+  test_json.cpp
+  test_live.cpp
+  test_moduleinfo.cpp
+  test_params.cpp
+  test_reaper.cpp
+  test_scanner.cpp
+  test_service.cpp
+  test_slot.cpp
+  test_state.cpp
+  test_util.cpp
+  Generating Code...
+  crate_tests.vcxproj -> D:\a\Dioman\Dioman\build\Release\crate_tests.exe

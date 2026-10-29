@@ -1,0 +1,5 @@
+Submodule 'public.sdk' (https://github.com/steinbergmedia/vst3_public_sdk) registered for path 'public.sdk'
+Cloning into 'D:/a/_temp/vst3sdk/public.sdk'...
+From https://github.com/steinbergmedia/vst3_public_sdk
+ * branch            3f20bcbf36283b1e5c450e088571be6226cd4e64 -> FETCH_HEAD
+Submodule path 'public.sdk': checked out '3f20bcbf36283b1e5c450e088571be6226cd4e64'
